@@ -1,0 +1,6 @@
+metric,base,adapter
+acc_norm,0.644,0.671
+acc,0.484,0.518
+mean_logprob_correct_ending,-34.41,-33.82
+fixed_acc_norm,,80
+broke_acc_norm,,53
