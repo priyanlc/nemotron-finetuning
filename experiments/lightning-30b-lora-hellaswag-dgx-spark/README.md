@@ -223,7 +223,15 @@ In our run, the log reported `nemo_automodel 0.5.0+922e83e42`, `transformers 5.1
 
 ### Step 3: Get the recipe
 
-**Run inside `lightning-lora`.** Copy the recipe into `/shared` so changes survive container removal. The repository includes the NVIDIA recipe from [AutoModel's main branch](https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/llm_finetune/nemotron/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml), unchanged. This is the version used for the reported run:
+**Run inside `lightning-lora`.** The recipe is one YAML file written by NVIDIA, `nemotron_nano_v3_5_lightning_singlegpu_lora.yaml`. Two repositories are involved here, so to be explicit, the file exists in three places:
+
+| Where | What it is |
+|---|---|
+| `/shared/nemotron-finetuning/experiments/lightning-30b-lora-hellaswag-dgx-spark/configs/` | **This repository's copy**, cloned in step 1. It is NVIDIA's file, unchanged, as it stood on [AutoModel's main branch](https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/llm_finetune/nemotron/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml) when we ran the experiment. **This is the version used for the reported run.** |
+| [NVIDIA's Automodel repository](https://github.com/NVIDIA-NeMo/Automodel) on GitHub | The original. NVIDIA may have changed it since our run. |
+| `/opt/Automodel/examples/llm_finetune/nemotron/` inside the container | The copy that shipped with the 26.08 image. It may be older than the GitHub version. |
+
+Use the first. Copy it into `/shared/configs/` so that your edits survive container removal:
 
 ```bash
 mkdir -p /shared/configs /shared/checkpoints /shared/logs
@@ -232,9 +240,9 @@ cp /shared/nemotron-finetuning/experiments/lightning-30b-lora-hellaswag-dgx-spar
 head -30 /shared/configs/$R
 ```
 
-If you did not clone the repository, download the recipe with `curl -fL https://raw.githubusercontent.com/NVIDIA-NeMo/Automodel/main/examples/llm_finetune/nemotron/$R -o /shared/configs/$R`.
+If you did not clone this repository in step 1, download NVIDIA's current version instead: `curl -fL https://raw.githubusercontent.com/NVIDIA-NeMo/Automodel/main/examples/llm_finetune/nemotron/$R -o /shared/configs/$R`.
 
-The container also includes a recipe under `/opt/Automodel/examples/llm_finetune/nemotron/`, but it may be older. The newer main-branch recipe worked with the 26.08 container in our test. If your installed version rejects a setting, see [If it fails](#if-it-fails).
+The main-branch recipe worked with the 26.08 container in our test, even though the container's own copy is older. If your installed version rejects a setting, see [If it fails](#if-it-fails).
 
 ### Step 4: Download the model
 
