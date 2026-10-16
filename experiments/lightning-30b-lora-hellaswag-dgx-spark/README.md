@@ -122,7 +122,26 @@ This is not a general restriction against full-parameter training on Spark: NVID
 
 The lowercase "they" and missing apostrophe in "dogs" are part of the original data. They matter because fine-tuning can reproduce stylistic patterns as well as learn the task (see [Results](#results)).
 
-AutoModel's `HellaSwag` dataset class builds each example from the context and its correct ending. It tokenises the two separately, then concatenates the token sequences without a chat template or separator. Context tokens receive the label `-100`, which PyTorch's cross-entropy ignores, so **only ending tokens contribute to the training loss**. The relevant recipe blocks are:
+AutoModel's `HellaSwag` dataset class turns each row into one training sequence: the context followed by the correct ending. The three wrong endings are not used for training. Taking the row above:
+
+1. **Choose the text.** Context: `A couple is outside with a bucket and a dog. The dog is running around trying to avoid a bath. they`. Target: `get the dog wet, then it runs away again.`
+2. **Tokenise the two strings separately, then join the token lists.** With the Lightning tokenizer, the context is 23 tokens and the ending 11, so the sequence has 34 tokens. Nothing is inserted between them: no chat template, no newline, not even a space. Because the ending was tokenised on its own, its first token is a bare `get` with no leading space, so decoded back to text the sequence reads "…a bath. theyget the dog wet…". (The evaluation script adds a space; see [Results](#results).)
+3. **Label each position with the token that should come next.** Positions inside the context get `-100`; from the last context token onwards the labels are the ending tokens; the final position gets `-100` because nothing follows it:
+
+| Position | Input token | Label (the token to predict next) | Counted in the loss? |
+|---|---|---|---|
+| 1 | `A` | `-100` | no |
+| 2 | `couple` | `-100` | no |
+| … | … | `-100` | no |
+| 22 | `.` | `-100` | no |
+| 23 | `they` | `get` | **yes** |
+| 24 | `get` | `the` | **yes** |
+| 25 | `the` | `dog` | **yes** |
+| … | … | … | **yes** |
+| 33 | `again` | `.` | **yes** |
+| 34 | `.` | `-100` | no |
+
+In code, the preprocessor emits `input_ids = ctx_ids + ending_ids` and `labels = [-100] * (len(ctx_ids) - 1) + ending_ids + [-100]`. The labels are already shifted one position to the left, which is why the last context token carries the first ending token as its label. `-100` is the `ignore_index` of PyTorch's cross-entropy, so those positions produce no loss and no gradient; padding added to equalise sequence lengths is labelled `-100` as well. Of the 34 positions, 11 count: the model is trained to continue the context, not to reproduce it, so **only ending tokens contribute to the training loss**. The loss reported for a step is the sum over the counted positions divided by their number across the eight examples in that step. The relevant recipe blocks are:
 
 ```yaml
 loss_fn:
