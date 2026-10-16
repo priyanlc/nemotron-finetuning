@@ -155,7 +155,7 @@ docker version          # Docker is part of DGX OS
 docker run --rm --gpus all nvcr.io/nvidia/nemo-automodel:26.08 nvidia-smi -L
 ```
 
-The final command pulls the NVIDIA image, which can take time on the first run, and checks GPU access. Expected output includes `GPU 0: NVIDIA GB10`. A `CUDA Forward Compatibility mode ENABLED` message is normal; step 2 also resolves the default 64 MB shared-memory warning.
+The final command pulls the NVIDIA image, which can take time on the first run, and checks GPU access. Expected output includes `GPU 0: NVIDIA GB10`. A `CUDA Forward Compatibility mode ENABLED` message is normal.
 
 If Docker requires `sudo`, you can add your user to its group with `sudo usermod -aG docker "$USER" && newgrp docker`.
 
