@@ -5,7 +5,7 @@
 | Part | Licence |
 |---|---|
 | `tools/compare_vllm.py`; the config blocks written for this repository (`experiments/*/configs/validation-block.yaml`, `custom-dataset-block.yaml`) | Copyright 2026 Priyan Chandrapala, Apache License 2.0. |
-| `README.md`, `experiments/*/README.md`, `experiments/*/results/`, `experiments/*/assets/*.png` | Copyright 2026 Priyan Chandrapala, CC BY 4.0. |
+| All Markdown files (`README.md`, `experiments/*/*.md`), `experiments/*/results/`, `experiments/*/assets/*.png` | Copyright 2026 Priyan Chandrapala, CC BY 4.0. |
 | `experiments/lightning-30b-lora-hellaswag-dgx-spark/configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` | Copyright NVIDIA Corporation, Apache License 2.0 (the header is kept in the file). |
 | `experiments/lightning-30b-lora-hellaswag-dgx-spark/assets/dgx-spark-oblique-2400.jpg` | "Oblique view of an NVIDIA DGX Spark" by Daniel Lu, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), resized. See `assets/cover-credit.md` beside it. |
 
