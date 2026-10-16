@@ -56,7 +56,7 @@ No custom training loop was needed. We used NVIDIA's AutoModel container (`nvcr.
 
 The workflow uses two containers. `lightning-lora` runs NVIDIA AutoModel for training and later runs the comparison script. `vllm-lightning` serves the base model and LoRA adapter. They share files and network access, but do not need to exchange data directly.
 
-**Shared files.** Both containers mount `~/nemo-shared` from the Spark as `/shared`. They use the same model cache, so the 60 GB weights are downloaded only once. AutoModel writes adapters and logs here; vLLM reads the adapter using `--lora-modules`. The walkthrough creates this directory structure:
+**Shared files.** Both containers mount `~/nemo-shared` from the Spark as `/shared`. They use the same model cache, so the 60 GB weights are downloaded only once. AutoModel writes adapters and logs here; vLLM reads the adapter using `--lora-modules`. The steps below build up this directory structure; only `data/` is left to you, for the optional last section:
 
 ```
 ~/nemo-shared/                 = /shared inside both containers
@@ -64,7 +64,7 @@ The workflow uses two containers. `lightning-lora` runs NVIDIA AutoModel for tra
 ├── configs/                   your copy of the recipe
 ├── checkpoints/<run>/         one folder per run: checkpoints, LATEST, LOWEST_VAL
 ├── logs/                      <run>.log, compare_vllm.json
-├── data/                      your own JSONL (see "Next step")
+├── data/                      your own JSONL for "Next step" (create it yourself)
 ├── nemotron-finetuning/       this repository, cloned in step 1
 └── compare_vllm.py            the evaluation script, copied from the clone in step 11
 ```
