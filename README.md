@@ -19,7 +19,7 @@ Status labels: `planned` (designed, not run) · `in progress` · `measured` (ran
 
 | Path | What it is |
 |---|---|
-| [`tools/compare_vllm.py`](tools/compare_vllm.py) | Compares a base model and a LoRA adapter served by one vLLM server: greedy completions side by side, then HellaSwag accuracy by log-likelihood of the four endings (acc and acc_norm, as in lm-evaluation-harness). Standard library plus `datasets`. Other tasks will add their own scorers. |
+| [`tools/compare_vllm.py`](tools/compare_vllm.py) | Compares a base model and a LoRA adapter served by one vLLM server: greedy completions side by side, then HellaSwag accuracy by log-likelihood of the four endings (acc and acc_norm, as in lm-evaluation-harness). Standard library plus `datasets`. Method, scoring function and options: [`tools/README.md`](tools/README.md). Other tasks will add their own scorers. |
 
 ## Conventions
 

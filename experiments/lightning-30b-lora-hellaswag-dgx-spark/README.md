@@ -434,35 +434,7 @@ In this example, the base model introduces a fence and repeats itself, while the
 
 ### Step 11: Run the full comparison
 
-The repository's `compare_vllm.py` evaluates both model names with identical inputs. It first prints example continuations, then scores the four endings of each HellaSwag question by requesting **prompt-token log-probabilities** with vLLM's `echo` and `logprobs` options; the highest-scoring ending is the answer, as in [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness). It skips the 64 validation examples and counts the answers the adapter fixed or broke.
-
-The scoring function is:
-
-```python
-def ending_logprobs(a, model, ctx, endings):
-    """Log-probability of each ending after ctx, from the server's prompt logprobs."""
-    prompts = [ctx + " " + e for e in endings]
-    r = call(a.url, "/completions", {"model": model, "prompt": prompts, "max_tokens": 1,
-                                     "temperature": 0, "echo": True, "logprobs": 0})
-    totals = [0.0] * len(prompts)
-    for ch in r["choices"]:
-        i = ch["index"]
-        lp = ch["logprobs"]
-        start = len(ctx)
-        # the echoed prompt tokens come first; the 1 generated token is last
-        for tok_lp, off in zip(lp["token_logprobs"][:-1], lp["text_offset"][:-1]):
-            if off >= start and tok_lp is not None:
-                totals[i] += tok_lp
-    per_char = [t / max(len(e), 1) for t, e in zip(totals, endings)]
-    return totals, per_char
-```
-
-The script reports two accuracy measures:
-
-- **`acc`** selects the ending with the highest total log-probability.
-- **`acc_norm`** normalises each total by the ending's character length to reduce the bias against longer options. This is the commonly reported HellaSwag metric in lm-eval.
-
-The script uses Python's standard library and `datasets`, which is already available in `lightning-lora`.
+`compare_vllm.py` scores the four endings of each HellaSwag question for both model names by asking vLLM for prompt-token log-probabilities, and reports `acc` and `acc_norm` (length-normalised, the usual HellaSwag metric); it skips the 64 validation rows and counts the answers the adapter fixed or broke. How it works, including the scoring function, is in [tools/README.md](../../tools/README.md). It needs only Python's standard library and `datasets`, already in `lightning-lora`.
 
 **Run on the Spark host, in the second terminal.** Copy the script to the shared directory, test 20 questions, then run the full 1,000-question evaluation. Our full run took about 10 minutes:
 
@@ -597,7 +569,7 @@ A possible next experiment is puzzle-style reasoning data from the Kaggle Nemotr
 | `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` | NVIDIA's recipe, verbatim from AutoModel's main branch (Apache-2.0; NVIDIA's header kept). |
 | `configs/validation-block.yaml` | The validation block appended in step 6. |
 | `configs/custom-dataset-block.yaml` | The JSONL prompt/completion dataset and validation blocks from "Next step". |
-| `../../tools/compare_vllm.py` | The evaluation script (step 11), shared by the repository's experiments. |
+| `../../tools/compare_vllm.py` | The evaluation script (step 11), shared by the repository's experiments; `../../tools/README.md` explains its method and options. |
 | `results/validation-loss.csv` | Validation loss and learning rate at each check of the 200-step run. |
 | `results/hellaswag-1000.csv` | Base against adapter on 1,000 held-out HellaSwag questions. |
 | `results/README.md` | What the two CSV files contain and how they were produced. |
