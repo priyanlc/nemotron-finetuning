@@ -281,7 +281,17 @@ Use `free -g` in another terminal to inspect memory. On GB10, `nvidia-smi` does 
 
 ### Step 6: Add validation and run 200 steps
 
-**Run inside `lightning-lora`, in your `tmux` session.** The original recipe reports training loss but has no validation set. Append the validation configuration used by NVIDIA's multi-GPU HellaSwag LoRA recipes. The same block is available at `configs/validation-block.yaml`:
+**Run inside `lightning-lora`, in your `tmux` session.** The original recipe reports training loss but has no validation set, so we add one before the long run.
+
+**Why validation matters.** Training loss is measured on the examples the model has just been trained on. It keeps falling even when the adapter is merely memorising those examples, so on its own it cannot tell you whether the model got better at the task. Validation loss is measured on held-out examples the model never trains on; here, 64 rows from HellaSwag's validation split, scored every 20 steps. We added it for three reasons:
+
+- **It shows whether the adapter generalises.** A falling validation loss means the model predicts correct endings it has not seen, which is the goal of the fine-tune. A validation loss that rises while training loss keeps falling is the classic sign of overfitting.
+- **It tells you when to stop.** In our run, validation loss had largely flattened by step 159 (see [Results](#results)), which is evidence that running the same schedule much longer would not help.
+- **It picks the checkpoint.** AutoModel keeps a `LOWEST_VAL` link to the saved checkpoint with the lowest validation loss, so the number guides which adapter you serve.
+
+The cost is small: 64 examples every 20 steps added little to the 24-minute run. The script in step 11 skips these 64 rows, so the final 1,000-question evaluation stays independent of the validation set.
+
+Append the validation configuration used by NVIDIA's multi-GPU HellaSwag LoRA recipes. The same block is available at `configs/validation-block.yaml`:
 
 ```bash
 cat >> /shared/configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml <<'EOF'
