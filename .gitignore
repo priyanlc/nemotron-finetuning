@@ -1,3 +1,20 @@
+# OS and editors
 .DS_Store
 *.bak
+
+# Python
 __pycache__/
+.venv/
+
+# Training outputs and model weights: adapters and checkpoints never go in git
+checkpoints/
+adapter*/
+*.safetensors
+*.distcp
+*.log
+
+# Data: an experiment's data/ folder holds fetch scripts and notes, not data
+experiments/*/data/*
+!experiments/*/data/*.py
+!experiments/*/data/*.sh
+!experiments/*/data/README.md

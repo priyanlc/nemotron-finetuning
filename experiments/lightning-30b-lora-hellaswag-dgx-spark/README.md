@@ -1,10 +1,12 @@
-# dgx-spark-lightning-lora
+# Nemotron 3.5 Lightning 30B-A3B: LoRA on one DGX Spark, measured with vLLM
+
+*Part of [nemotron-finetuning](../../README.md), a series of fine-tuning experiments on NVIDIA's Nemotron models.*
 
 **Fine-tune NVIDIA Nemotron 3.5 Lightning (30B-A3B) with LoRA on a single DGX Spark, then compare the adapter with the base model using vLLM.** This README is a reproducible, step-by-step guide. It includes the commands, configuration, evaluation script and measurements from 14 October 2026.
 
 > **Tested setup:** The training and evaluation described here ran on one DGX Spark (GB10). Any item marked `[VERIFY: ...]` still needs confirmation. The proposed custom-dataset adaptation at the end has not yet been tested.
 
-![A gold NVIDIA DGX Spark on a wooden desk, seen from an oblique angle](cover/dgx-spark-oblique-2400.jpg)
+![A gold NVIDIA DGX Spark on a wooden desk, seen from an oblique angle](assets/dgx-spark-oblique-2400.jpg)
 
 *Cover photo: "Oblique view of an NVIDIA DGX Spark" by [Daniel Lu](https://commons.wikimedia.org/wiki/File:Nvidia_DGX_Spark_oblique_view_dllu.jpg), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), resized.*
 
@@ -28,7 +30,7 @@
 | 10 | [Check both models, then try one prompt on both](#step-10-check-both-models-then-try-one-prompt-on-both) | Spark host | About a minute |
 | 11 | [Run the full comparison](#step-11-run-the-full-comparison) | Spark host, executing inside `lightning-lora` | About 10 minutes |
 
-**After the walkthrough:** [Results](#results) · [Under the hood](#under-the-hood) · [Troubleshooting](#if-it-fails) · [Using your own data](#next-step-sft-for-a-custom-use-case) · [Repository files](#files-in-this-repository) · [References](#references)
+**After the walkthrough:** [Results](#results) · [Under the hood](#under-the-hood) · [Troubleshooting](#if-it-fails) · [Using your own data](#next-step-sft-for-a-custom-use-case) · [Experiment files](#files-in-this-experiment) · [References](#references)
 
 ## A 30B model on a desk
 
@@ -48,7 +50,7 @@ No custom training loop was needed. We used NVIDIA's AutoModel container (`nvcr.
 
 ## How the pieces fit together
 
-![How the setup fits together](diagrams/01-setup.png)
+![How the setup fits together](assets/01-setup.png)
 
 *Training and serving use separate containers, with a shared directory, host network and GPU.*
 
@@ -63,7 +65,7 @@ The workflow uses two containers. `lightning-lora` runs NVIDIA AutoModel for tra
 ├── checkpoints/<run>/         one folder per run: checkpoints, LATEST, LOWEST_VAL
 ├── logs/                      <run>.log, compare_vllm.json
 ├── data/                      your own JSONL (see "Next step")
-├── dgx-spark-lightning-lora/  this repository, cloned in step 1
+├── nemotron-finetuning/       this repository, cloned in step 1
 └── compare_vllm.py            the evaluation script, copied from the clone in step 11
 ```
 
@@ -89,7 +91,7 @@ Full-parameter supervised fine-tuning (SFT) updates every model weight. For a 30
 
 **LoRA makes single-device training practical.** It freezes the base weights and trains small adapter matrices instead. Our run used about **62 GiB**.
 
-![Why LoRA: memory to fine-tune a 30B model](diagrams/02-memory-budget.png)
+![Why LoRA: memory to fine-tune a 30B model](assets/02-memory-budget.png)
 
 *Estimated memory for full-parameter AdamW fine-tuning (excluding activations) compared with measured LoRA memory use on the Spark.*
 
@@ -161,7 +163,7 @@ Create the shared directory and clone this repository into it. This makes the re
 
 ```bash
 mkdir -p ~/nemo-shared
-git clone https://github.com/priyanlc/dgx-spark-lightning-lora ~/nemo-shared/dgx-spark-lightning-lora
+git clone https://github.com/priyanlc/nemotron-finetuning ~/nemo-shared/nemotron-finetuning
 ```
 
 ### Step 2: Start NVIDIA's AutoModel container
@@ -207,7 +209,7 @@ In our run, the log reported `nemo_automodel 0.5.0+922e83e42`, `transformers 5.1
 ```bash
 mkdir -p /shared/configs /shared/checkpoints /shared/logs
 R=nemotron_nano_v3_5_lightning_singlegpu_lora.yaml
-cp /shared/dgx-spark-lightning-lora/configs/$R /shared/configs/
+cp /shared/nemotron-finetuning/experiments/lightning-30b-lora-hellaswag-dgx-spark/configs/$R /shared/configs/
 head -30 /shared/configs/$R
 ```
 
@@ -444,13 +446,13 @@ The script uses Python's standard library and `datasets`, which is already avail
 **Run on the Spark host, in the second terminal.** Copy the script to the shared directory, test 20 questions, then run the full 1,000-question evaluation. Our full run took about 10 minutes:
 
 ```bash
-cp ~/nemo-shared/dgx-spark-lightning-lora/compare_vllm.py ~/nemo-shared/
+cp ~/nemo-shared/nemotron-finetuning/tools/compare_vllm.py ~/nemo-shared/
 docker start lightning-lora
 docker exec -it lightning-lora python3 /shared/compare_vllm.py --n 20 --gen 2
 docker exec -it lightning-lora python3 /shared/compare_vllm.py --n 1000
 ```
 
-Without a clone, download the script using `curl -fL https://raw.githubusercontent.com/priyanlc/dgx-spark-lightning-lora/main/compare_vllm.py -o ~/nemo-shared/compare_vllm.py`.
+Without a clone, download the script using `curl -fL https://raw.githubusercontent.com/priyanlc/nemotron-finetuning/main/tools/compare_vllm.py -o ~/nemo-shared/compare_vllm.py`.
 
 `docker exec` requires a running container. `docker start lightning-lora` starts it in the background, and it consumes no training GPU memory until a workload runs. Check with `docker ps`. The script writes results to `~/nemo-shared/logs/compare_vllm.json`. When finished, stop the vLLM server with `Ctrl-C`; its `--rm` container is then removed.
 
@@ -469,7 +471,7 @@ This produces another roughly 60 GB of BF16 weights. The `--dtype bfloat16` opti
 
 ## Results
 
-![Training and evaluation results](diagrams/03-results.png)
+![Training and evaluation results](assets/03-results.png)
 
 *Left: validation loss at ten checkpoints, measured on 64 examples (note the truncated y-axis). Right: base-versus-adapter accuracy on 1,000 held-out HellaSwag questions.*
 
@@ -639,7 +641,7 @@ A possible next experiment is puzzle-style reasoning data from the Kaggle Nemotr
 - **Validation loss and task accuracy answer different questions.** A paired test on 1,000 held-out questions provided clearer evidence than the initial 100-question check.
 - **Data formatting affects model behaviour.** Inspect free-text outputs as well as accuracy, especially when training and evaluation use different separators.
 
-## Files in this repository
+## Files in this experiment
 
 | Path | What it is |
 |---|---|
@@ -647,13 +649,12 @@ A possible next experiment is puzzle-style reasoning data from the Kaggle Nemotr
 | `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` | NVIDIA's recipe, verbatim from AutoModel's main branch (Apache-2.0; NVIDIA's header kept). |
 | `configs/validation-block.yaml` | The validation block appended in step 6. |
 | `configs/custom-dataset-block.yaml` | The JSONL prompt/completion dataset and validation blocks from "Next step". |
-| `compare_vllm.py` | The evaluation script (step 11). |
+| `../../tools/compare_vllm.py` | The evaluation script (step 11), shared by the repository's experiments. |
 | `results/validation-loss.csv` | Validation loss and learning rate at each check of the 200-step run. |
 | `results/hellaswag-1000.csv` | Base against adapter on 1,000 held-out HellaSwag questions. |
 | `results/README.md` | What the two CSV files contain and how they were produced. |
-| `diagrams/` | The three diagrams. |
-| `cover/` | The cover photo (CC BY-SA 4.0, Daniel Lu) and its credit. |
-| `LICENSE.md` | Licences for each part of the repository. |
+| `assets/` | The three diagrams, the cover photo (CC BY-SA 4.0, Daniel Lu) and its credit. |
+| `../../LICENSES.md` | Licences for each part of the repository: code Apache-2.0; text, data and figures CC BY 4.0. |
 
 ## References
 
