@@ -77,8 +77,6 @@ The workflow uses two containers. `lightning-lora` runs NVIDIA AutoModel for tra
 | `/shared` = `~/nemo-shared` | Kept | Kept | Kept |
 | The container's own layer: `/root`, `/tmp`, installed packages such as tmux, edits outside `/shared` | Kept | Deleted | Kept (container stopped; `docker start -ai lightning-lora`) |
 | Running processes: a training run, tmux sessions | Ended | Ended | Ended |
-| The image: `/opt/Automodel`, `/opt/venv` as shipped | Kept | Kept until `docker rmi` | Kept |
-| GPU memory and `/dev/shm` | Cleared | Cleared | Cleared |
 
 **Keep anything important under `/shared`.** Do not share the entire directory: the Hugging Face cache also contains your authentication token.
 
@@ -343,7 +341,7 @@ find /shared/checkpoints/lightning-200/ -maxdepth 4 \( -name "*.json" -o -name "
 ls -lh /shared/checkpoints/lightning-200/LOWEST_VAL/model/
 ```
 
-The adapter is stored as `adapter_model.safetensors` and `adapter_config.json` in Hugging Face PEFT format. vLLM loads it alongside the base weights in step 9; step 11 shows the merge alternative.
+The adapter is stored as `adapter_model.safetensors` and `adapter_config.json` in Hugging Face PEFT format. vLLM loads it alongside the base weights in step 9; if it cannot, [If it fails](#if-it-fails) has a merge alternative.
 
 The run directory also contains:
 
@@ -449,19 +447,6 @@ Without a clone, download the script using `curl -fL https://raw.githubuserconte
 
 `docker start lightning-lora` runs the stopped training container in the background so that `docker exec` works; idle, it uses no GPU memory. The script writes results to `~/nemo-shared/logs/compare_vllm.json`. When finished, stop the vLLM server with `Ctrl-C`; its `--rm` container is then removed.
 
-**Fallback if vLLM cannot load the adapter:** merge the LoRA weights into a standalone model with AutoModel's merge utility, after checking that it exists **inside `lightning-lora`**:
-
-```bash
-ls /opt/Automodel/tools/merge_lora.py && \
-python3 /opt/Automodel/tools/merge_lora.py \
-  --base-model nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 \
-  --adapter-path /shared/checkpoints/lightning-200/epoch_0_step_199/model \
-  --output-dir /shared/merged/lightning-hellaswag \
-  --automodel-native-export --dtype bfloat16
-```
-
-This writes another roughly 60 GB of BF16 weights (`--dtype bfloat16` keeps the base precision; the tool otherwise defaults to float16). Serve the result with `--model /shared/merged/lightning-hellaswag --served-model-name lightning-hellaswag` and no LoRA flags, and the base model separately as `lightning-base`. This is an alternative route, not the method used for the measurements below.
-
 ## Results
 
 ![Training and evaluation results](assets/03-results.png)
@@ -488,9 +473,7 @@ Lower validation loss means better prediction of held-out correct endings. It de
 | Mean log-prob of the correct ending | −34.41 | −33.82 | +0.59 |
 | Answers fixed / broken (acc_norm) | | 80 / 53 | net +27 |
 
-**How strong is the evidence?** On normalised accuracy, the adapter corrected 80 answers that the base model missed, but made 53 previously correct answers wrong. A paired **McNemar test** on these disagreements gives **p ≈ 0.02**: under the null hypothesis of no difference, a split at least this uneven would be unusual. The estimated 95% confidence interval for the accuracy gain is approximately **+0.5 to +4.9 percentage points**.
-
-A preliminary 100-question run showed a two-point gain, with eight answers fixed and six broken. That sample was too small to distinguish the change reliably from random variation. The 1,000-question test provides stronger evidence, although the measured improvement remains modest.
+**How strong is the evidence?** On normalised accuracy, the adapter corrected 80 answers that the base model missed, but made 53 previously correct answers wrong. A paired **McNemar test** on these disagreements gives **p ≈ 0.02**: under the null hypothesis of no difference, a split at least this uneven would be unusual. The estimated 95% confidence interval for the accuracy gain is approximately **+0.5 to +4.9 percentage points**. An earlier 100-question check (eight fixed, six broken) was too small to separate the change from noise, which is why we scaled to 1,000; the larger test gives stronger evidence, but the improvement remains modest.
 
 **Interpretation and limitations.** The adapter improves accuracy by **2.7 percentage points**, but the result is specific to this model, training data and evaluation setup. Some changes are stylistic. For example, the adapter sometimes produces lowercase sentence starts or missing spaces after full stops ("rinsed with water.the car is then dried"). HellaSwag contains inconsistent formatting, and training joined context and ending [without a separator](#the-dataset-and-the-sft-prompts).
 
@@ -527,7 +510,7 @@ Serving and evaluation:
 | You see | What to do |
 |---|---|
 | `no matching manifest for linux/arm64` on pull | That vLLM tag has no ARM build; check NVIDIA's Lightning cookbook for a newer tag. |
-| Server error mentioning LoRA or unsupported modules | Use the merge route at the end of step 11. |
+| Server error mentioning LoRA or unsupported modules | Merge the adapter into a standalone model **inside `lightning-lora`** (check that `/opt/Automodel/tools/merge_lora.py` exists first): `python3 /opt/Automodel/tools/merge_lora.py --base-model nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 --adapter-path /shared/checkpoints/lightning-200/epoch_0_step_199/model --output-dir /shared/merged/lightning-hellaswag --automodel-native-export --dtype bfloat16`. It writes about 60 GB; `--dtype bfloat16` keeps the base precision (the tool otherwise defaults to float16). Serve the result with `--model /shared/merged/lightning-hellaswag --served-model-name lightning-hellaswag` and no LoRA flags, and the base model separately as `lightning-base`. Not the route used for the measurements. |
 | Out of memory while starting | Lower `--gpu-memory-utilization` to 0.75 or `--max-model-len` to 4096, and close other programs. |
 | An error naming `--mamba-backend` | Remove that flag and try again. |
 | `Error response from daemon: container … is not running` | The training container is stopped. Run `docker start lightning-lora`, then the `docker exec` command again. |
