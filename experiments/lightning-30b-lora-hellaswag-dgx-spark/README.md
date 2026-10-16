@@ -4,7 +4,7 @@
 
 **Fine-tune NVIDIA Nemotron 3.5 Lightning (30B-A3B) with LoRA on a single DGX Spark, then compare the adapter with the base model using vLLM.** This README is a reproducible, step-by-step guide. It includes the commands, configuration, evaluation script and measurements from 14 October 2026.
 
-> **Tested setup:** The training and evaluation described here ran on one DGX Spark (GB10). Any item marked `[VERIFY: ...]` still needs confirmation.
+> **Tested setup:** The training and evaluation described here ran on one DGX Spark (GB10).
 
 ![A gold NVIDIA DGX Spark on a wooden desk, seen from an oblique angle](assets/dgx-spark-oblique-2400.jpg)
 
@@ -547,45 +547,27 @@ The full recipe is `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml`. I
 
 **Precision.** The recipe does not override the model dtype, so the base weights load in **BF16**. The recipe uses FP32 for numerically sensitive normalisation (`rms_norm: torch_fp32`), and the log identifies small Mamba-2 parameters stored in FP32 (`NemotronV3MambaFP32Params`).
 
-**Adapter precision is not yet verified.** Comparable NVIDIA recipes use FP32 LoRA weights and optimiser state, but the checkpoint from this run still needs inspection. [VERIFY: Run the dtype check below and report the result.]
+**Adapter precision.** The recipe does not set `lora_dtype`, so AutoModel creates each LoRA matrix in the dtype of the weight it attaches to (`dtype = lora_dtype or obj.weight.dtype` in [its LoRA code](https://github.com/NVIDIA-NeMo/Automodel/blob/main/nemo_automodel/components/_peft/lora.py)): BF16 here, like the base weights. `torch.optim.AdamW` allocates its moment buffers in the parameters' dtype, so the optimiser state is BF16 too. The loss is still computed in FP32, because `MaskedCrossEntropy` upcasts the logits first. To train the adapter in FP32 instead, add `lora_dtype: torch.float32` to the recipe's `peft` block; we have not measured whether it changes the result. To check a saved adapter, run **inside `lightning-lora`**:
 
-**FSDP2 on one GPU.** Fully Sharded Data Parallel normally divides model weights and optimiser state across GPUs. With a world size of one, AutoModel skips sharding. The recipe retains `strategy: fsdp2` for compatibility with larger configurations, while `ep_size: 1` keeps all experts on the local GPU. The log confirms this and shows other relevant settings:
+```bash
+python3 -c "
+from safetensors import safe_open; import collections
+f = safe_open('/shared/checkpoints/lightning-200/LOWEST_VAL/model/adapter_model.safetensors', 'pt')
+print(collections.Counter(str(f.get_tensor(k).dtype) for k in f.keys()))"
+```
 
-```
-World size or FSDP mesh size is 1, skipping parallelization.
-Applied submodule activation checkpointing to 52 layers: {'mlp': 23, 'attention': 29, …}
-Gradient accumulation steps: 8
-No clip_grad_norm.max_norm specified in config, using default value of 1.0
-```
+Expected output: `Counter({'torch.bfloat16': N})`, N being the number of adapter tensors.
+
+**FSDP2 on one GPU.** Fully Sharded Data Parallel normally divides model weights and optimiser state across GPUs. With a world size of one, AutoModel skips sharding. The recipe retains `strategy: fsdp2` for compatibility with larger configurations, while `ep_size: 1` keeps all experts on the local GPU. The log confirms it (`World size or FSDP mesh size is 1, skipping parallelization`); gradient clipping defaults to a max norm of 1.0.
 
 **One optimiser step, in order.**
 
-1. Take 8 micro-batches of one example each (`global_batch_size: 8`, `local_batch_size: 1`).
-2. Run each forward pass in bf16 through the 52 layers, with **activation checkpointing** on all of them: a layer keeps only its input and recomputes the rest in the backward pass, trading compute for memory.
-3. Compute the loss on the ending tokens, plus 0.1 × the multi-token-prediction loss from the MTP layer predicting two extra tokens ahead.
-4. Run the backward pass; only the LoRA weights receive gradients.
-5. Add up the 8 passes' gradients (**gradient accumulation**).
-6. Clip the combined gradient to a norm of 1.0.
-7. Let AdamW (betas 0.9/0.95, weight decay 0.1) update the adapter, at a learning rate that warms up over 2 steps to 1e-4 and decays along a cosine curve to 1e-5.
+1. Each of the 8 micro-batches (one example each) runs forward in BF16 through the 52 layers with **activation checkpointing**: a layer keeps only its input and recomputes the rest in the backward pass, trading compute for memory.
+2. The loss is computed on the ending tokens, plus 0.1 × the multi-token-prediction loss from the MTP layer predicting two extra tokens ahead.
+3. The backward pass gives gradients to the LoRA weights only; the 8 passes' gradients are accumulated.
+4. The combined gradient is clipped to norm 1.0 and AdamW updates the adapter at the scheduled learning rate (table above).
 
 **Memory use.** The 60 GB base weights account for most of the **62 GiB** measured; the adapter is small, and short inputs plus activation checkpointing keep activation memory low. Longer sequences need more (see [Next step](#next-step-sft-for-a-custom-use-case)).
-
-**Verify the adapter dtype.** After training, run the following **inside `lightning-lora`**. It prints the adapter tensor types and parameter count and looks for FP32 modules and checkpoint wrappers in the log:
-
-```bash
-python3 - <<'PY'
-import glob, collections
-from safetensors import safe_open
-f = glob.glob("/shared/checkpoints/lightning-200/LOWEST_VAL/model/adapter_model.safetensors")[0]
-h = safe_open(f, "pt"); dtypes = collections.Counter(); n = 0
-for k in h.keys():
-    t = h.get_tensor(k); dtypes[str(t.dtype)] += 1; n += t.numel()
-print(f"{n/1e6:.1f}M adapter parameters, tensor formats: {dict(dtypes)}")
-PY
-grep -m3 -E "Float32RMSNorm|MambaFP32Params|CheckpointWrapper" /shared/logs/lightning-200.log
-```
-
-If the checkpoint tensors are `torch.float32`, that confirms the **saved adapter dtype**. It does not, by itself, prove the dtype used for every intermediate computation or optimiser state.
 
 ## If it fails
 
