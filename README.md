@@ -1,8 +1,8 @@
 # dgx-spark-lightning-lora
 
-**Fine-tuning NVIDIA's Nemotron 3.5 Lightning (30B-A3B) with LoRA on one DGX Spark, using NVIDIA's NeMo AutoModel recipe, and measuring the adapter against the base model through vLLM.** A step-by-step guide with every command, the recipe, the evaluation script and the results measured on 2026-10-14. The companion blog post tells the story; this README is the manual.
+**Fine-tune NVIDIA Nemotron 3.5 Lightning (30B-A3B) with LoRA on a single DGX Spark, then compare the adapter with the base model using vLLM.** This README is a reproducible, step-by-step guide. It includes the commands, configuration, evaluation script and measurements from 14 October 2026.
 
-> **Status:** everything below ran on one DGX Spark (GB10). Items marked `[VERIFY: …]` are still being confirmed.
+> **Tested setup:** The training and evaluation described here ran on one DGX Spark (GB10). Any item marked `[VERIFY: ...]` still needs confirmation. The proposed custom-dataset adaptation at the end has not yet been tested.
 
 ![A gold NVIDIA DGX Spark on a wooden desk, seen from an oblique angle](cover/dgx-spark-oblique-2400.jpg)
 
@@ -10,51 +10,51 @@
 
 ## Contents
 
-Background, for context before you start: [A 30B model on a desk](#a-30b-model-on-a-desk) · [How the pieces fit together](#how-the-pieces-fit-together) · [Why LoRA, not full-parameter SFT](#why-lora-not-full-parameter-sft) · [The dataset and the SFT prompts](#the-dataset-and-the-sft-prompts)
+**Before you start:** [The model and hardware](#a-30b-model-on-a-desk) · [Architecture](#how-the-pieces-fit-together) · [Why LoRA](#why-lora-not-full-parameter-sft) · [Training data](#the-dataset-and-the-sft-prompts)
 
-The steps, with where each one runs and how long it took us:
+**Hands-on guide:** Follow the steps in order. The table shows which terminal or container to use and the approximate time required.
 
-| Step | | Where | Time |
+| Step | Task | Run from | Approximate time |
 |---|---|---|---|
-| 1 | [Check the Spark and clone this repository](#step-1-check-the-spark-and-clone-this-repository) | Spark terminal | minutes, plus the first container pull |
-| 2 | [Start NVIDIA's AutoModel container](#step-2-start-nvidias-automodel-container) | Spark terminal → `lightning-lora` | minutes |
-| 3 | [Get the recipe](#step-3-get-the-recipe) | `lightning-lora` | a minute |
-| 4 | [Download the model](#step-4-download-the-model) | `lightning-lora` | a 60 GB download |
-| 5 | [Run the 20-step test](#step-5-run-the-20-step-test) | `lightning-lora` | several minutes to load, then a few minutes |
-| 6 | [Add validation and run 200 steps](#step-6-add-validation-and-run-200-steps) | `lightning-lora` | about 24 minutes, after loading |
-| 7 | [What you get](#step-7-what-you-get) | `lightning-lora` | — |
-| 8 | [Free the GPU and start the vLLM container](#step-8-free-the-gpu-and-start-the-vllm-container) | second Spark terminal → `vllm-lightning` | the image pull |
-| 9 | [Start the server with the adapter](#step-9-start-the-server-with-the-adapter) | `vllm-lightning` | several minutes to load and compile |
-| 10 | [Check both models, then try one prompt on both](#step-10-check-both-models-then-try-one-prompt-on-both) | Spark terminal | a minute |
-| 11 | [Run the full comparison](#step-11-run-the-full-comparison) | Spark terminal (the script runs inside `lightning-lora`) | about 10 minutes |
+| 1 | [Check the Spark and clone this repository](#step-1-check-the-spark-and-clone-this-repository) | Spark host | A few minutes, plus the initial image pull |
+| 2 | [Start NVIDIA's AutoModel container](#step-2-start-nvidias-automodel-container) | Spark host, then `lightning-lora` | A few minutes |
+| 3 | [Get the recipe](#step-3-get-the-recipe) | `lightning-lora` | About a minute |
+| 4 | [Download the model](#step-4-download-the-model) | `lightning-lora` | Depends on the 60 GB download |
+| 5 | [Run the 20-step test](#step-5-run-the-20-step-test) | `lightning-lora` | Several minutes to load, then a short run |
+| 6 | [Add validation and run 200 steps](#step-6-add-validation-and-run-200-steps) | `lightning-lora` | About 24 minutes after loading |
+| 7 | [What you get](#step-7-what-you-get) | `lightning-lora` | Inspection only |
+| 8 | [Free the GPU and start the vLLM container](#step-8-free-the-gpu-and-start-the-vllm-container) | Second Spark terminal, then `vllm-lightning` | Depends on the image pull |
+| 9 | [Start the server with the adapter](#step-9-start-the-server-with-the-adapter) | `vllm-lightning` | Several minutes to load and compile |
+| 10 | [Check both models, then try one prompt on both](#step-10-check-both-models-then-try-one-prompt-on-both) | Spark host | About a minute |
+| 11 | [Run the full comparison](#step-11-run-the-full-comparison) | Spark host, executing inside `lightning-lora` | About 10 minutes |
 
-Afterwards: [Results](#results) · [Under the hood](#under-the-hood) · [If it fails](#if-it-fails) · [Next step: SFT for a custom use case](#next-step-sft-for-a-custom-use-case) · [Files in this repository](#files-in-this-repository) · [References](#references)
+**After the walkthrough:** [Results](#results) · [Under the hood](#under-the-hood) · [Troubleshooting](#if-it-fails) · [Using your own data](#next-step-sft-for-a-custom-use-case) · [Repository files](#files-in-this-repository) · [References](#references)
 
 ## A 30B model on a desk
 
-Fine-tuning a 30-billion-parameter language model normally means a multi-GPU server. We did it on a DGX Spark, a box that sits on a desk, in about 24 minutes of training, and the adapter beat the base model on 1,000 held-out questions by a margin that survives a significance test.
+A 30-billion-parameter model would usually require multiple GPUs for full-parameter fine-tuning. With LoRA, we fine-tuned **Nemotron 3.5 Lightning on one DGX Spark** in about 24 minutes. On 1,000 held-out HellaSwag questions, the adapter improved normalised accuracy from **64.4% to 67.1%**.
 
-The model is NVIDIA's [Nemotron 3.5 Lightning](https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16): 30B parameters in total, about 3B active for any one token, in a hybrid of Mamba-2, mixture-of-experts (MoE) and attention layers, with multi-token prediction (MTP) built in. The machine is a DGX Spark: NVIDIA's GB10 Blackwell GPU with 128 GB of memory shared between CPU and GPU, on an ARM processor.
+[Nemotron 3.5 Lightning](https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16) has 30B total parameters, with roughly 3B active per token. It combines Mamba-2, mixture-of-experts (MoE) and attention layers, and supports multi-token prediction (MTP). The DGX Spark uses an NVIDIA GB10 Blackwell GPU and an ARM CPU with **128 GB of unified memory**.
 
-We wrote no training code. The training container (`nvcr.io/nvidia/nemo-automodel:26.08`) and the recipe are NVIDIA's; NVIDIA's CI runs this recipe on a GB10. The serving image is the vLLM project's. We added a validation set, a longer run and an evaluation. This guide has every command we ran, in order, with what to expect from each, then the measured results and what they do and don't show, and, for those who want it, what the recipe does and what happens inside a training step.
+No custom training loop was needed. We used NVIDIA's AutoModel container (`nvcr.io/nvidia/nemo-automodel:26.08`) and recipe, which NVIDIA also tests on GB10. We added validation, extended the training run and used vLLM to compare the resulting adapter against the base model. The steps below explain how to reproduce the setup and interpret the results.
 
-**What you need:**
+**Prerequisites**
 
-- A DGX Spark running DGX OS, with Docker (part of DGX OS) and about 200 GB of free disk: 60 GB of weights, plus the container, data and checkpoints.
-- A Hugging Face account, with the model's OpenMDW-1.1 terms accepted on its page.
-- An afternoon. The model download is 60 GB, the 200-step run takes about 24 minutes, and scoring 1,000 questions takes about ten.
+- A DGX Spark with DGX OS and Docker, plus roughly 200 GB of free disk space for the model, images, data and checkpoints.
+- A Hugging Face account with access to the model and acceptance of its OpenMDW-1.1 terms.
+- Enough time for a roughly 60 GB download, a 24-minute training run (after model loading) and a roughly 10-minute evaluation.
 
-**What we'll do:** train a LoRA adapter with NVIDIA's recipe (steps 1–7), then serve the base model and the adapter side by side with vLLM and measure the difference (steps 8–11).
+**Workflow:** Steps 1–7 train the adapter. Steps 8–11 serve the base model and adapter through vLLM, then evaluate them on the same questions.
 
 ## How the pieces fit together
 
 ![How the setup fits together](diagrams/01-setup.png)
 
-*Two containers on one Spark, linked by the shared folder, the host network and the GPU.*
+*Training and serving use separate containers, with a shared directory, host network and GPU.*
 
-Training and serving run in separate containers. `lightning-lora` is NVIDIA's AutoModel image: it trains the adapter and later runs the comparison script. `vllm-lightning` is the vLLM project's image: it serves the base model and the adapter. They never talk to each other directly; three things on the Spark connect them.
+The workflow uses two containers. `lightning-lora` runs NVIDIA AutoModel for training and later runs the comparison script. `vllm-lightning` serves the base model and LoRA adapter. They share files and network access, but do not need to exchange data directly.
 
-**The shared folder.** `~/nemo-shared` on the Spark is `/shared` in both containers. It holds the model cache (60 GB, stored once and read by both), the recipe, checkpoints, logs and data. Training writes the adapter there; vLLM reads it with `--lora-modules`. Nothing is copied between containers. This is the layout the steps below create:
+**Shared files.** Both containers mount `~/nemo-shared` from the Spark as `/shared`. They use the same model cache, so the 60 GB weights are downloaded only once. AutoModel writes adapters and logs here; vLLM reads the adapter using `--lora-modules`. The walkthrough creates this directory structure:
 
 ```
 ~/nemo-shared/                 = /shared inside both containers
@@ -67,13 +67,13 @@ Training and serving run in separate containers. `lightning-lora` is NVIDIA's Au
 └── compare_vllm.py            the evaluation script, copied from the clone in step 11
 ```
 
-**The network.** Both use `--network host`, so `localhost:8000` means the same thing in both containers and on the Spark.
+**Network.** Both containers use `--network host`, making the vLLM server at `localhost:8000` accessible from the Spark host and either container.
 
-**The GPU and its memory.** Both have `--gpus all`. The vLLM server reserves about 80% of the 128 GB while it's up and training needs about 62 GiB, so you train or serve, not both. An idle training container uses no GPU memory.
+**GPU and memory.** Both containers use `--gpus all`, but training and serving run at different times. Training uses about 62 GiB; vLLM is configured with a GPU-memory utilisation target of 80%. The training container may remain running while idle.
 
-What survives what:
+**What persists when you stop a container?**
 
-| Location | Leave the shell, `docker start` | `docker rm` | Spark reboot |
+| Resource | Container stop/restart | `docker rm` | Spark reboot |
 |---|---|---|---|
 | `/shared` = `~/nemo-shared` | Kept | Kept | Kept |
 | The container's own layer: `/root`, `/tmp`, installed packages such as tmux, edits outside `/shared` | Kept | Deleted | Kept (container stopped; `docker start -ai lightning-lora`) |
@@ -81,17 +81,19 @@ What survives what:
 | The image: `/opt/Automodel`, `/opt/venv` as shipped | Kept | Kept until `docker rmi` | Kept |
 | GPU memory and `/dev/shm` | Cleared | Cleared | Cleared |
 
-Rule of thumb: if you'd be upset to lose it, put it under `/shared`; and to step away while something is running in the container, detach from it (`Ctrl-p` then `Ctrl-q`, see step 2) rather than exit. The Hugging Face token file in `/shared` grants access to your account, so don't share the folder as a whole.
+**Keep anything important under `/shared`.** To leave a running container without stopping it, detach with `Ctrl-p`, then `Ctrl-q` (step 2). Do not share the entire directory: the Hugging Face cache also contains your authentication token.
 
 ## Why LoRA, not full-parameter SFT
 
-Both are supervised fine-tuning (SFT): training on examples of the behaviour you want. Ideally we'd use full-parameter SFT, which updates all 30 billion weights. But training every weight with the AdamW optimizer needs roughly 360–480 GB for weights, gradients and optimizer state. NVIDIA's own full-weight recipe for this model uses two DGX Stations. The Spark has 128 GB, shared with the system. So we use LoRA: the base model stays frozen, and we train small adapter matrices instead. The whole run fits in about 62 GiB.
+Full-parameter supervised fine-tuning (SFT) updates every model weight. For a 30B model, AdamW requires an estimated **360–480 GB** for the weights, gradients and optimiser states, before activations. NVIDIA's full-weight recipe for this model uses two DGX Stations. A single Spark has 128 GB shared between the CPU and GPU.
+
+**LoRA makes single-device training practical.** It freezes the base weights and trains small adapter matrices instead. Our run used about **62 GiB**.
 
 ![Why LoRA: memory to fine-tune a 30B model](diagrams/02-memory-budget.png)
 
-*Memory to fine-tune a 30B model: full-parameter SFT with AdamW, estimated from bytes per weight before activations, against LoRA SFT as measured on the Spark.*
+*Estimated memory for full-parameter AdamW fine-tuning (excluding activations) compared with measured LoRA memory use on the Spark.*
 
-[LoRA](https://arxiv.org/abs/2106.09685) (low-rank adaptation) trains two small matrices per adapted linear layer; their product is the update to the frozen weight. The recipe uses rank 8 (`dim`, the matrices' width) with `alpha: 32`, and skips Mamba's `out_proj` layers, whose kernel reads the weight directly:
+[LoRA](https://arxiv.org/abs/2106.09685), or low-rank adaptation, represents each weight update as the product of two small matrices. The recipe uses rank 8 (`dim`) and `alpha: 32`. It excludes Mamba's `out_proj` layers because their kernel accesses the weights directly:
 
 ```yaml
 peft:
@@ -103,11 +105,11 @@ peft:
   use_memory_efficient_lora: true
 ```
 
-Two qualifications. The limit is the model's size, not the Spark's: NVIDIA's GB10 recipes include a full fine-tune of Qwen3-8B (`qwen3_8b_squad_spark.yaml`). And LoRA isn't a consolation prize: with small datasets it often matches full-parameter training, which overwrites more of what the model knows, and NVIDIA's own [customization guidance](https://docs.nvidia.com/nemo/microservices/latest/customizer/about.html) recommends LoRA as the starting point for most use cases.
+This is not a general restriction against full-parameter training on Spark: NVIDIA also provides a GB10 full-fine-tuning recipe for the smaller Qwen3-8B (`qwen3_8b_squad_spark.yaml`). LoRA is also a useful choice in its own right, particularly when data is limited. NVIDIA's [customisation guidance](https://docs.nvidia.com/nemo/microservices/latest/customizer/about.html) recommends it as a starting point for many use cases.
 
 ## The dataset and the SFT prompts
 
-[HellaSwag](https://huggingface.co/datasets/Rowan/hellaswag) is a benchmark of everyday scenes: a context and four endings, one of them right. Here is row 14,225 of the training split, as the dataset stores it:
+[HellaSwag](https://huggingface.co/datasets/Rowan/hellaswag) tests whether a model can choose a plausible ending for an everyday scene from four options. This example is training row 14,225, reproduced as stored in the dataset:
 
 > **Context:** A couple is outside with a bucket and a dog. The dog is running around trying to avoid a bath. they
 >
@@ -116,9 +118,9 @@ Two qualifications. The limit is the model's size, not the Spark's: NVIDIA's GB1
 > 2. **get the dog wet, then it runs away again.** (correct)
 > 3. hose the dog off with soap and a diaper.
 
-Notice the lowercase "they" and "dogs" without an apostrophe: HellaSwag has formatting habits, and the adapter will learn them too (see [Results](#results)).
+The lowercase "they" and missing apostrophe in "dogs" are part of the original data. They matter because fine-tuning can reproduce stylistic patterns as well as learn the task (see [Results](#results)).
 
-AutoModel's `HellaSwag` class turns each row into one training example: the context followed directly by the correct ending, as raw text with no chat template and no separator between the two (it tokenizes them separately and concatenates the token lists). The loss is scored on the ending only, because the context's tokens are labelled `-100`, the value PyTorch's cross-entropy ignores. In the recipe that's two blocks:
+AutoModel's `HellaSwag` dataset class builds each example from the context and its correct ending. It tokenises the two separately, then concatenates the token sequences without a chat template or separator. Context tokens receive the label `-100`, which PyTorch's cross-entropy ignores, so **only ending tokens contribute to the training loss**. The relevant recipe blocks are:
 
 ```yaml
 loss_fn:
@@ -130,15 +132,17 @@ dataset:
   split: train
 ```
 
-The scale is small: 200 steps of 8 examples is 1,600 training examples, about 4% of the 39,905-row training split. Validation used 64 examples from the validation split, and the final evaluation 1,000 more that training never saw. At evaluation the model doesn't write an answer; it's shown each ending after the context and asked how likely it is, and the most likely one is its pick, as in the [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness).
+With eight examples per optimiser step, 200 steps process **1,600 training examples**, approximately 4% of HellaSwag's 39,905 training rows. We used a separate set of 64 validation examples during training and another 1,000 examples for final evaluation.
 
-It's a demonstration task: it teaches scene continuation and HellaSwag's way of writing, proves the pipeline and gives a clean before-and-after measurement, but it isn't a skill most people need, which is why the [last section](#next-step-sft-for-a-custom-use-case) swaps the data.
+For evaluation, the model scores all four endings rather than generating a new continuation. The highest-scoring ending is its answer, following the approach used by [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness).
+
+HellaSwag provides a manageable end-to-end test, but it is not a target application. The [custom-data section](#next-step-sft-for-a-custom-use-case) shows how to adapt the workflow to another task.
 
 ## Train: from a fresh Spark to an adapter, step by step
 
 ### Step 1: Check the Spark and clone this repository
 
-On the Spark's own terminal, not inside a container:
+**Run on the Spark host**, outside any container:
 
 ```bash
 nvidia-smi              # "NVIDIA GB10", "CUDA Version: 13.x"
@@ -149,9 +153,11 @@ docker version          # Docker is part of DGX OS
 docker run --rm --gpus all nvcr.io/nvidia/nemo-automodel:26.08 nvidia-smi -L
 ```
 
-The last line pulls NVIDIA's container and checks that it sees the GPU; it's large, so the first pull takes a while. It should print `GPU 0: NVIDIA GB10`. A "CUDA Forward Compatibility mode ENABLED" note is normal, and the 64 MB shared-memory warning goes away with the flags in step 2. If `docker` needs `sudo`, add yourself to the group once: `sudo usermod -aG docker "$USER" && newgrp docker`.
+The final command pulls the NVIDIA image, which can take time on the first run, and checks GPU access. Expected output includes `GPU 0: NVIDIA GB10`. A `CUDA Forward Compatibility mode ENABLED` message is normal; step 2 also resolves the default 64 MB shared-memory warning.
 
-Then create the shared folder and clone this repository into it, so the recipe and the evaluation script are at hand inside the containers (steps 3 and 11 each have a download alternative if you'd rather not clone; if `git` is missing, `sudo apt-get install -y git`):
+If Docker requires `sudo`, you can add your user to its group with `sudo usermod -aG docker "$USER" && newgrp docker`.
+
+Create the shared directory and clone this repository into it. This makes the recipe and evaluation script available inside both containers. Steps 3 and 11 also provide download alternatives. If Git is missing, install it with `sudo apt-get install -y git`.
 
 ```bash
 mkdir -p ~/nemo-shared
@@ -160,7 +166,7 @@ git clone https://github.com/priyanlc/dgx-spark-lightning-lora ~/nemo-shared/dgx
 
 ### Step 2: Start NVIDIA's AutoModel container
 
-On the Spark, start a named container with the shared folder mounted at `/shared`. The flags follow NVIDIA's DGX Station guide for this model, plus the thread count from the recipe's own header and an allocator setting:
+**Run on the Spark host.** Start NVIDIA's AutoModel container and mount the shared directory at `/shared`. These flags follow NVIDIA's DGX Station guidance, with the recipe's CPU-thread setting and a PyTorch allocator option:
 
 ```bash
 mkdir -p ~/nemo-shared
@@ -175,12 +181,16 @@ docker run -it \
   nvcr.io/nvidia/nemo-automodel:26.08
 ```
 
-- `-v ~/nemo-shared:/shared`: everything you keep goes under `/shared`.
-- `HF_HOME`: the model download lands in `/shared`, so it isn't downloaded again next time.
-- `OMP_NUM_THREADS=8`: NVIDIA's recipe asks for 8 CPU threads while loading the experts.
-- `--shm-size=32g`: shared memory for data loading. NVIDIA's guide uses 128g on a much larger Station; 32g leaves the Spark's unified memory for the model.
+Key options:
 
-If you leave the container's shell it stops, and anything running in it ends; come back with `docker start -ai lightning-lora`. To step out *without* stopping it, press `Ctrl-p` then `Ctrl-q` (Docker's detach keys); `docker attach lightning-lora` takes you back. Steps 8, 10 and 11 run on the Spark itself, so the simplest arrangement is a second terminal on the Spark for those, leaving this one in the container. Inside the container, check the installation:
+- `-v ~/nemo-shared:/shared`: persists files on the host.
+- `HF_HOME`: stores downloaded model files in `/shared` so they can be reused.
+- `OMP_NUM_THREADS=8`: sets the CPU thread count used when loading experts.
+- `--shm-size=32g`: gives data loading shared memory without using the 128 GB setting intended for a larger DGX Station.
+
+Exiting the container's main shell stops the container and its processes. Use `docker start -ai lightning-lora` to restart it. To leave it running, press `Ctrl-p`, then `Ctrl-q`; reattach with `docker attach lightning-lora`.
+
+Keep a second Spark terminal available for steps 8, 10 and 11. **Inside `lightning-lora`**, verify the installation:
 
 ```bash
 nvidia-smi -L
@@ -188,11 +198,11 @@ python3 -c 'import nemo_automodel; print(nemo_automodel.__version__)'
 python3 -c 'from nemo_automodel.components._peft.lora import PeftConfig; print("LoRA OK")'
 ```
 
-On the tested Spark, the training log reports nemo_automodel 0.5.0+922e83e42, transformers 5.12.1 and torch 2.13 (nv26.06) with CUDA 13.3, and "Using custom model implementation for NemotronHForCausalLM", which is AutoModel's own Nemotron-H code.
+In our run, the log reported `nemo_automodel 0.5.0+922e83e42`, `transformers 5.12.1`, `torch 2.13 (nv26.06)` and CUDA 13.3. It also reported `Using custom model implementation for NemotronHForCausalLM`, indicating that AutoModel used its Nemotron-H implementation.
 
 ### Step 3: Get the recipe
 
-Inside `lightning-lora`. Copy the recipe into `/shared`, so your edits are kept. The copy in this repository is NVIDIA's file, verbatim from [AutoModel's main branch](https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/llm_finetune/nemotron/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml), and it is the one the results in this guide were measured with:
+**Run inside `lightning-lora`.** Copy the recipe into `/shared` so changes survive container removal. The repository includes the NVIDIA recipe from [AutoModel's main branch](https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/llm_finetune/nemotron/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml), unchanged. This is the version used for the reported run:
 
 ```bash
 mkdir -p /shared/configs /shared/checkpoints /shared/logs
@@ -201,11 +211,13 @@ cp /shared/dgx-spark-lightning-lora/configs/$R /shared/configs/
 head -30 /shared/configs/$R
 ```
 
-Without a clone, download the same file: `curl -fL https://raw.githubusercontent.com/NVIDIA-NeMo/Automodel/main/examples/llm_finetune/nemotron/$R -o /shared/configs/$R`. The container ships its own copy under `/opt/Automodel/examples/llm_finetune/nemotron/`, which may be older. The main-branch file is newer than the container's AutoModel, and that worked here: NVIDIA's DGX Station recipe for this model runs on the same 26.08 container with the same model and backend settings. If a setting is rejected, the error names it (see [If it fails](#if-it-fails)).
+If you did not clone the repository, download the recipe with `curl -fL https://raw.githubusercontent.com/NVIDIA-NeMo/Automodel/main/examples/llm_finetune/nemotron/$R -o /shared/configs/$R`.
+
+The container also includes a recipe under `/opt/Automodel/examples/llm_finetune/nemotron/`, but it may be older. The newer main-branch recipe worked with the 26.08 container in our test. If your installed version rejects a setting, see [If it fails](#if-it-fails).
 
 ### Step 4: Download the model
 
-Still inside `lightning-lora`. The model is under NVIDIA's OpenMDW-1.1 licence; accept its terms on the model page if asked. Then log in and download about 60 GB:
+**Run inside `lightning-lora`.** Accept the model's OpenMDW-1.1 terms on Hugging Face if required, then authenticate and download approximately 60 GB:
 
 ```bash
 hf auth login            # token from huggingface.co/settings/tokens
@@ -213,11 +225,13 @@ hf download nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16
 du -sh /shared/.cache/huggingface
 ```
 
-Downloading first keeps network problems separate from training problems. HellaSwag is small and downloads when training starts.
+Downloading the model in advance makes network errors easier to distinguish from training errors. HellaSwag is downloaded automatically when training begins.
 
 ### Step 5: Run the 20-step test
 
-Inside `lightning-lora`. Start tmux so the run survives a dropped connection (`Ctrl-b d` detaches from tmux and `tmux attach -t train` returns; `Ctrl-p` `Ctrl-q` then detaches from the container, as in step 2), then run the recipe as NVIDIA ships it, with only the checkpoint folder changed:
+**Run inside `lightning-lora`.** Install and start `tmux` to keep the training session available if your terminal connection drops. Detach from `tmux` using `Ctrl-b`, then `d`, and return with `tmux attach -t train`. Docker's separate detach shortcut is `Ctrl-p`, then `Ctrl-q`.
+
+Run NVIDIA's original 20-step recipe, changing only the checkpoint output directory:
 
 ```bash
 apt-get update && apt-get install -y tmux && tmux new -s train
@@ -228,17 +242,17 @@ CUDA_VISIBLE_DEVICES=0 automodel /shared/configs/nemotron_nano_v3_5_lightning_si
   2>&1 | tee /shared/logs/lightning-test.log
 ```
 
-What to expect:
+**Expected behaviour:**
 
-- **Loading takes several minutes.** AutoModel reads the checkpoint and loads the split experts straight into its grouped layout. The terminal can be quiet; watch `top` in a second tmux window (`Ctrl-b c`).
-- **20 lines** like `step N | loss … | grad_norm … | lr … | mem … GiB | tps …`, a few seconds apart. The loss should fall over the 20 steps.
-- **A saved adapter** in `/shared/checkpoints/lightning-test/` at the end.
+- **Model loading takes several minutes.** AutoModel loads the split experts into its grouped layout. If the output pauses, check `top` in a second `tmux` window (`Ctrl-b`, then `c`).
+- **Training prints 20 step records**, including `loss`, `grad_norm`, `lr`, memory and tokens per second (`tps`). Loss should generally decline.
+- **An adapter is saved** under `/shared/checkpoints/lightning-test/` when the run completes.
 
-Check memory from another window with `free -g`. On the GB10, `nvidia-smi` can't show a GPU memory figure, because the CPU and GPU share one memory pool.
+Use `free -g` in another terminal to inspect memory. On GB10, `nvidia-smi` does not display a separate GPU-memory figure because memory is shared with the CPU.
 
 ### Step 6: Add validation and run 200 steps
 
-Inside `lightning-lora`, in the tmux session. The recipe has no validation set, so it only reports training loss. For a run you can judge, append a validation block to your copy of the recipe. It's the same block NVIDIA uses in its multi-GPU HellaSwag LoRA recipes (also in this repository as `configs/validation-block.yaml`):
+**Run inside `lightning-lora`, in your `tmux` session.** The original recipe reports training loss but has no validation set. Append the validation configuration used by NVIDIA's multi-GPU HellaSwag LoRA recipes. The same block is available at `configs/validation-block.yaml`:
 
 ```bash
 cat >> /shared/configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml <<'EOF'
@@ -255,9 +269,9 @@ validation_dataloader:
 EOF
 ```
 
-`tail -12 /shared/configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` should show the block once; running the command twice appends it twice.
+Check with `tail -12 /shared/configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml`. Append the block **only once**; running the command again would duplicate it.
 
-Then start the real run. The 200 steps take about 24 minutes, at about 7 s each including the validation checks, after a few minutes of loading. This version names each run after the date and time, refuses to reuse a folder that already exists, and gives the log the same name, so you can't resume a finished run or overwrite a log by mistake:
+Start the 200-step run. In our test, training took about **24 minutes after loading**, including validation every 20 steps. The command creates a timestamped run name, checks for an existing checkpoint directory and writes a matching log, helping prevent accidental resumption or overwrites:
 
 ```bash
 cd /opt/Automodel
@@ -271,37 +285,39 @@ CUDA_VISIBLE_DEVICES=0 automodel /shared/configs/nemotron_nano_v3_5_lightning_si
 echo "run: $RUN"; grep "\[val\]" /shared/logs/$RUN.log
 ```
 
-The two overrides are everything that differs from NVIDIA's recipe: `--step_scheduler.max_steps 200` and `--step_scheduler.val_every_steps 20`. Change 200 in both places for a different length.
+The training-schedule overrides are `--step_scheduler.max_steps 200` and `--step_scheduler.val_every_steps 20`. The checkpoint directory override isolates this run from earlier ones. If you change the run length, also update the run name to avoid confusion.
 
-While it runs, every step prints loss, gradient norm, learning rate, memory and tokens per second (training loss was 2.90 at step 0 and 2.78 at step 1), and every 20 steps a `[val]` line reports the loss on the 64 held-out examples. It should fall over the run, though not necessarily at every check: ours rose by a thousandth at the last one (see [Results](#results)). A `LOWEST_VAL` link in the checkpoint folder points to the best saved one.
+Each step logs training loss, gradient norm, learning rate, memory and throughput. Our training loss started at 2.90 (step 0) and 2.78 (step 1). Every 20 steps, a `[val]` line reports loss on the 64 held-out examples. Validation loss should generally decrease, although individual checks can fluctuate. See [Results](#results) for our measurements. The checkpoint directory contains a `LOWEST_VAL` link to the best **saved** checkpoint.
 
-Three things to know about run folders:
+**Checkpoint behaviour to be aware of:**
 
-- **One folder per run.** If `--checkpoint.checkpoint_dir` already holds checkpoints, AutoModel resumes from the latest one instead of starting over. If that run already reached `max_steps`, it trains nothing: the log shows `Loading checkpoint from …/epoch_0_step_199` and the progress bar jumps straight to the end. `tee` also overwrites an existing log of the same name. The `RUN=…` pattern above prevents both.
-- **To train longer, start a fresh run.** Resuming an old folder with a higher `max_steps` works, but the learning-rate schedule restored from the checkpoint is as long as the old run, so the extra steps run at the minimum rate (1e-5). Check the `lr` column to see which you got.
-- **Only the final step is saved** by default (the recipe checkpoints every 1,000 steps plus at the end), so after a 200-step run `LOWEST_VAL` points to step 199. Add `--step_scheduler.ckpt_every_steps 20` to keep a checkpoint at every validation.
+- **Use a new folder for each run.** AutoModel resumes if checkpoints already exist. If that run has already reached `max_steps`, no further steps are trained. The log may show `Loading checkpoint from …/epoch_0_step_199`. Reusing a log name also lets `tee` overwrite previous output.
+- **A longer run is not the same as a fresh schedule.** If you resume with a higher `max_steps`, the restored learning-rate schedule retains the old duration. Extra steps may therefore run at the minimum learning rate (1e-5). Check the logged `lr`.
+- **The default recipe saves the final checkpoint, not every validation check.** Its checkpoint interval is 1,000 steps, plus a final save. For a 200-step run, `LOWEST_VAL` therefore points to step 199, even if validation loss was lower earlier. Add `--step_scheduler.ckpt_every_steps 20` to save each validation checkpoint.
 
-If a log was overwritten anyway, two things recover the results: `readlink /shared/checkpoints/<run>/LOWEST_VAL` names the best step, and, if the run was in the same tmux window, `tmux capture-pane -p -S -200000 > /shared/logs/recovered.txt` saves what tmux still remembers.
+If you overwrite a log, `readlink /shared/checkpoints/<run>/LOWEST_VAL` identifies the best saved checkpoint. If the original `tmux` session still has the output in its scrollback, recover it with `tmux capture-pane -p -S -200000 > /shared/logs/recovered.txt`.
 
-When the run has finished, give it the name the rest of this guide uses, `lightning-200`. These are relative links inside `/shared`, so they resolve in both containers and on the Spark, and every later command works as written:
+After training, create the stable name `lightning-200` for the timestamped run. The following relative symlinks work from both containers because they share `/shared`:
 
 ```bash
 ln -sfn $RUN /shared/checkpoints/lightning-200
 ln -sf $RUN.log /shared/logs/lightning-200.log
 ```
 
-If you've opened a new shell since and `$RUN` is gone, `ls /shared/checkpoints/` shows the folder's name.
+If `$RUN` is no longer set in your shell, use `ls /shared/checkpoints/` to find the timestamped directory before creating the links.
 
 ### Step 7: What you get
 
-Inside `lightning-lora` (the trailing slash makes `find` follow the `lightning-200` link):
+**Run inside `lightning-lora`.** Inspect the generated files. The trailing slash makes `find` follow the `lightning-200` symlink:
 
 ```bash
 find /shared/checkpoints/lightning-200/ -maxdepth 4 \( -name "*.json" -o -name "*.safetensors" \) | sort
 ls -lh /shared/checkpoints/lightning-200/LOWEST_VAL/model/
 ```
 
-`adapter_model.safetensors` and `adapter_config.json` are the LoRA adapter, in Hugging Face PEFT format, small compared with the 60 GB model. To use it, load the base model and apply the adapter (what vLLM does in step 9), or merge them. The run folder holds more than the adapter:
+The adapter is stored as `adapter_model.safetensors` and `adapter_config.json` in Hugging Face PEFT format. It is much smaller than the 60 GB base model. You can load it alongside the base weights, as vLLM does in step 9, or merge it into a standalone model.
+
+The run directory also contains:
 
 | Path | What it is |
 |---|---|
@@ -312,17 +328,17 @@ ls -lh /shared/checkpoints/lightning-200/LOWEST_VAL/model/
 | `epoch_0_step_N/optim/`, `dataloader/`, `rng/`, `step_scheduler.pt` | Optimizer, data position, random state and step counter, used to resume exactly. |
 | `epoch_0_step_N/config.yaml` | The full config the run used, including command-line overrides. |
 
-Everything is under `~/nemo-shared` on the Spark, so it stays after the container is removed. That's the training done. What the recipe's settings mean, and what happened inside each step, is explained in [Under the hood](#under-the-hood), after the results.
+Everything under `~/nemo-shared` persists if you remove the container. Training is now complete. For details of the recipe and optimiser steps, see [Under the hood](#under-the-hood).
 
 ## Evaluate: serve the base model and the adapter with vLLM
 
-[vLLM](https://github.com/vllm-project/vllm) is a fast inference server with an OpenAI-style API. Following [Arm's DGX Spark fine-tuning guide](https://learn.arm.com/learning-paths/laptops-and-desktops/pytorch-finetuning-on-spark/4-testing/), we run it in its own container and send the same prompts to the original and the fine-tuned model. One difference: vLLM can load the LoRA adapter directly on top of the base model, so a single server answers as both, with no merging.
+[vLLM](https://github.com/vllm-project/vllm) provides an OpenAI-compatible inference API. We follow the container approach in [Arm's DGX Spark guide](https://learn.arm.com/learning-paths/laptops-and-desktops/pytorch-finetuning-on-spark/4-testing/), but use vLLM's native LoRA support. **One server exposes both the base model and its adapter**, without merging the weights.
 
-Which vLLM: NVIDIA's Lightning cookbook uses `vllm/vllm-openai:v0.27.1` and lists a tested DGX Spark configuration for it. NVIDIA's Spark settings are for the 4-bit NVFP4 checkpoint; the adapter was trained on BF16, so the command below serves BF16 with a smaller context window.
+We use `vllm/vllm-openai:v0.27.1`, the release referenced in NVIDIA's Lightning cookbook. NVIDIA's example serves the 4-bit NVFP4 model; our command serves the BF16 checkpoint and uses a shorter context window.
 
 ### Step 8: Free the GPU and start the vLLM container
 
-Open a second terminal on the Spark for steps 8 to 11; the server you start in step 9 keeps its terminal busy. Make sure no training run is active: `free -g` on the Spark should show most of the memory free again. The `lightning-lora` container can stay as it is, stopped or idle; it only uses the GPU while training. On the Spark host:
+**Run on the Spark host, in a second terminal.** The vLLM server will occupy its terminal while it runs. Before starting, confirm that training has ended and memory is available with `free -g`. The `lightning-lora` container can remain stopped or idle.
 
 ```bash
 docker pull vllm/vllm-openai:v0.27.1
@@ -334,13 +350,11 @@ docker run -it --rm --name vllm-lightning \
   vllm/vllm-openai:v0.27.1
 ```
 
-- `-v ~/nemo-shared:/shared` and `HF_HOME`: vLLM reuses the model you already downloaded and can read your adapter.
-- `--network host`: the server is reachable at `localhost:8000` from the Spark and from the training container.
-- `--ipc=host`: shared memory for vLLM, as in NVIDIA's and Arm's commands.
+The important flags are `-v ~/nemo-shared:/shared` and `HF_HOME`, which reuse the existing model cache and adapter; `--network host`, which exposes the server at `localhost:8000`; and `--ipc=host`, which gives vLLM access to host IPC resources.
 
 ### Step 9: Start the server with the adapter
 
-Inside the vLLM container. This points at the step-199 adapter from the 200-step run:
+**Run inside `vllm-lightning`.** Serve the BF16 base model with the LoRA adapter saved at step 199:
 
 ```bash
 vllm serve nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 \
@@ -359,17 +373,17 @@ vllm serve nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 \
 - `--gpu-memory-utilization 0.80`: the share of the 128 GB unified pool vLLM may take, leaving the rest for the OS. The BF16 weights alone are about 60 GB.
 - `--mamba-backend flashinfer`: the Mamba kernels from NVIDIA's Lightning commands.
 
-The first start is slow: loading 60 GB, then compiling kernels. NVIDIA's cookbook warns that progress can sit at 0% for minutes. Wait for `Application startup complete`.
+Initial startup can take several minutes while vLLM loads the weights and compiles kernels. Progress may temporarily stay at 0%. Do not send requests until the log reports `Application startup complete`.
 
 ### Step 10: Check both models, then try one prompt on both
 
-On the Spark, in a terminal other than the server's:
+**Run on the Spark host, in a terminal separate from the server.** First check the available model names:
 
 ```bash
 curl -s http://localhost:8000/v1/models | python3 -m json.tool | grep '"id"'
 ```
 
-You should see `lightning-base` and `lightning-hellaswag` (the `modelperm-…` ids are vLLM's permission records, not extra models). The adapter was trained on raw text continuations, so use the completions endpoint:
+You should see `lightning-base` and `lightning-hellaswag`. Any `modelperm-…` entries are vLLM permission records, not additional models. Because training used raw text continuations, test through the **completions** endpoint:
 
 ```bash
 for M in lightning-base lightning-hellaswag; do
@@ -382,18 +396,24 @@ for M in lightning-base lightning-hellaswag; do
 done
 ```
 
-On the tested Spark:
+**Example output from our Spark:**
 
 | Model | Continuation after "…She" |
 |---|---|
 | **lightning-base** | is trying to catch the dog with the bucket. The dog is jumping over a fence. The woman is chasing the dog. The dog is running away. The woman is trying to catch the dog. |
 | **lightning-hellaswag** | is trying to get the dog in the tub. The dog jumps out of the tub and runs away. The woman chases the dog around the yard. The dog jumps into the tub and the woman |
 
-The base drifts (a fence appears) and repeats itself; the adapter stays on the bath. If the two continuations are identical, the adapter may not be applied; check the server output for LoRA warnings. But one prompt is a hint, not a measurement, and this one is a near-copy of a training-split scene (see [The dataset](#the-dataset-and-the-sft-prompts)). Step 11 measures.
+In this example, the base model introduces a fence and repeats itself, while the adapter stays with the bath scene. If both outputs are identical, check the vLLM logs for LoRA-loading warnings.
+
+**This is only a smoke test.** The prompt closely resembles a [training example](#the-dataset-and-the-sft-prompts), so it does not establish a general improvement. Step 11 provides the quantitative comparison.
 
 ### Step 11: Run the full comparison
 
-`compare_vllm.py` (in this repository) sends the same requests to both names. It prints side-by-side continuations, then HellaSwag accuracy: for each question it asks the server for the log-probability of each of the four endings after the context, using `echo` and `logprobs` so the server scores the prompt itself, and picks the most likely, as lm-eval does. It skips the 64 validation rows the training run used, and reports how many answers the adapter fixed and broke. This is its core:
+The repository's `compare_vllm.py` evaluates both model names with identical inputs. It first prints example continuations, then scores four candidate endings for each HellaSwag question.
+
+Instead of generating an answer, it requests **prompt-token log-probabilities** using the vLLM `echo` and `logprobs` options. It sums the scores for each ending and selects the highest-scoring candidate, following the lm-eval approach. The script skips the 64 examples used for validation and counts the answers the adapter fixed or broke.
+
+The scoring function is:
 
 ```python
 def ending_logprobs(a, model, ctx, endings):
@@ -414,9 +434,14 @@ def ending_logprobs(a, model, ctx, endings):
     return totals, per_char
 ```
 
-`totals` gives **acc**: the pick is the ending with the highest total log-probability. `per_char` gives **acc_norm**, which divides by the ending's length in characters so longer endings aren't penalised; it's lm-eval's headline HellaSwag number.
+The script reports two accuracy measures:
 
-The script needs only the Python standard library plus `datasets`, so run it from the training container, which has `datasets` and shares the network with the server. On the Spark, in the second terminal: copy it from the clone to the shared folder, run a small test, then the full 1,000 questions (about 10 minutes):
+- **`acc`** selects the ending with the highest total log-probability.
+- **`acc_norm`** normalises each total by the ending's character length to reduce the bias against longer options. This is the commonly reported HellaSwag metric in lm-eval.
+
+The script uses Python's standard library and `datasets`, which is already available in `lightning-lora`. The container shares the host network with vLLM.
+
+**Run on the Spark host, in the second terminal.** Copy the script to the shared directory, test 20 questions, then run the full 1,000-question evaluation. Our full run took about 10 minutes:
 
 ```bash
 cp ~/nemo-shared/dgx-spark-lightning-lora/compare_vllm.py ~/nemo-shared/
@@ -425,9 +450,11 @@ docker exec -it lightning-lora python3 /shared/compare_vllm.py --n 20 --gen 2
 docker exec -it lightning-lora python3 /shared/compare_vllm.py --n 1000
 ```
 
-Without a clone, fetch the script with `curl -fL https://raw.githubusercontent.com/priyanlc/dgx-spark-lightning-lora/main/compare_vllm.py -o ~/nemo-shared/compare_vllm.py` instead. `docker exec` needs a running container, and `lightning-lora` stops whenever you leave its shell; `docker start` without `-ai` starts it in the background, where it does nothing on the GPU until you run something in it. `docker ps` should show both containers. Results are saved to `~/nemo-shared/logs/compare_vllm.json`. When you're done, stop the server with Ctrl-C; the container removes itself.
+Without a clone, download the script using `curl -fL https://raw.githubusercontent.com/priyanlc/dgx-spark-lightning-lora/main/compare_vllm.py -o ~/nemo-shared/compare_vllm.py`.
 
-**If the adapter won't load**, merge it into a standalone model and serve that instead, the route Arm's guide takes. AutoModel documents a merge tool; check that it's in your container first, inside `lightning-lora`:
+`docker exec` requires a running container. `docker start lightning-lora` starts it in the background, and it consumes no training GPU memory until a workload runs. Check with `docker ps`. The script writes results to `~/nemo-shared/logs/compare_vllm.json`. When finished, stop the vLLM server with `Ctrl-C`; its `--rm` container is then removed.
+
+**Fallback if vLLM cannot load the adapter:** Merge the LoRA weights into a standalone model, as in Arm's guide. AutoModel provides a merge utility; first check that it exists **inside `lightning-lora`**:
 
 ```bash
 ls /opt/Automodel/tools/merge_lora.py && \
@@ -438,24 +465,26 @@ python3 /opt/Automodel/tools/merge_lora.py \
   --automodel-native-export --dtype bfloat16
 ```
 
-This writes a full ~60 GB copy (`--dtype bfloat16` keeps the base's precision; the tool's default is float16). Then serve `--model /shared/merged/lightning-hellaswag --served-model-name lightning-hellaswag` without the LoRA flags, and in a second session the base model as `lightning-base`, running `compare_vllm.py` while each is up.
+This produces another roughly 60 GB of BF16 weights. The `--dtype bfloat16` option retains the base model's precision; the tool otherwise defaults to float16. Serve the merged model with `--model /shared/merged/lightning-hellaswag --served-model-name lightning-hellaswag` and no LoRA flags. Serve the base model separately as `lightning-base` for comparison. This fallback is an alternative procedure, not the method used for the measurements below.
 
 ## Results
 
 ![Training and evaluation results](diagrams/03-results.png)
 
-*Left: validation loss on 64 held-out examples at each of the 10 checks; the y-axis starts at 2.2. Right: HellaSwag accuracy on 1,000 held-out questions, base model against adapter.*
+*Left: validation loss at ten checkpoints, measured on 64 examples (note the truncated y-axis). Right: base-versus-adapter accuracy on 1,000 held-out HellaSwag questions.*
 
-**Training.** 200 steps took about 24 minutes (09:03:28 to 09:27:15), about 7 s per step including the 10 validation checks, at about 62 GiB of memory. Throughput was about 107 tokens/s, low because HellaSwag examples are short (624–760 tokens per step) and per-step overhead dominates. The numbers below come from the run's `validation.jsonl` (also in `results/validation-loss.csv`):
+**Training performance.** The 200-step run took about 24 minutes (09:03:28 to 09:27:15), averaged roughly 7 seconds per step including validation, and used about 62 GiB of memory. Throughput averaged approximately 107 tokens/s. Each step processed only 624–760 tokens, so fixed overhead accounted for a substantial share of runtime.
+
+Validation measurements come from `validation.jsonl` and are also included in `results/validation-loss.csv`:
 
 | Step | 19 | 39 | 59 | 79 | 99 | 119 | 139 | 159 | 179 | 199 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Validation loss | 2.753 | 2.542 | 2.428 | 2.366 | 2.340 | 2.332 | 2.325 | 2.312 | **2.311** | 2.313 |
 | Learning rate | 9.8e-5 | 9.2e-5 | 8.2e-5 | 7.0e-5 | 5.6e-5 | 4.2e-5 | 2.9e-5 | 1.9e-5 | 1.2e-5 | 1.0e-5 |
 
-Validation loss measures how well the model predicts the correct endings of examples it isn't trained on; lower is better. It fell steadily, with about 90% of the improvement by step 99 and a flat curve after step 159: for this data, 200 steps was plenty.
+Lower validation loss means better prediction of held-out correct endings. It decreased from **2.753 at step 19 to a minimum of 2.311 at step 179**. Roughly 90% of that reduction had occurred by step 99, and the curve had largely flattened by step 159. This suggests limited benefit from continuing the same run much longer on this dataset. The adapter evaluated below is the **step-199 checkpoint**, because the recipe did not save the earlier validation checkpoints.
 
-**Answer quality.** A falling loss shows the adapter learned; it doesn't say how often the model now picks the right ending. Step 11 does. HellaSwag validation rows 64–1063, 1,000 questions used for neither training nor validation, scored through the vLLM server in 566 s:
+**Evaluation accuracy.** Training loss alone does not tell us how often the model selects the correct ending. We therefore scored HellaSwag validation rows 64–1063, which were excluded from training and the 64-example validation checks. The 1,000-question comparison took **566 seconds** through vLLM:
 
 | | Base | Adapter | Change |
 |---|---|---|---|
@@ -464,17 +493,21 @@ Validation loss measures how well the model predicts the correct endings of exam
 | Mean log-prob of the correct ending | −34.41 | −33.82 | +0.59 |
 | Answers fixed / broken (acc_norm) | | 80 / 53 | net +27 |
 
-Is +2.7 points real? The adapter fixed 80 answers and broke 53. A paired **McNemar test** looks only at those disagreements and asks how likely an 80-to-53 split would be if the adapter made no difference: p ≈ 0.02, about a 2% chance. The paired 95% range for the gain is about +0.5 to +4.9 points. Sample size mattered: a first run on 100 questions showed +2 points with 8 fixed and 6 broken, indistinguishable from chance. Use `--n 1000` for a decision.
+**How strong is the evidence?** On normalised accuracy, the adapter corrected 80 answers that the base model missed, but made 53 previously correct answers wrong. A paired **McNemar test** on these disagreements gives **p ≈ 0.02**: under the null hypothesis of no difference, a split at least this uneven would be unusual. The estimated 95% confidence interval for the accuracy gain is approximately **+0.5 to +4.9 percentage points**.
 
-**What to make of it.** The gain is real but modest, which is typical when the base model already handles the task reasonably well. Part of it is style: the adapter's free text now drops the space after a full stop and starts sentences in lowercase ("rinsed with water.the car is then dried"), copying HellaSwag's formatting; the lowercase "they" in [The dataset](#the-dataset-and-the-sft-prompts) is where that comes from, and the missing spaces come from the training format: AutoModel's `SFTSingleTurnPreprocessor` tokenizes context and ending separately and concatenates the token lists with nothing between them, so the model learned context glued to ending. `compare_vllm.py` scores `ctx + " " + ending`, with a space, so the accuracy figures slightly understate the adapter. And the absolute scores sit below published HellaSwag figures because the prompt is plain, without lm-eval's activity-label prefix, on a model tuned for chat and reasoning. Compare base against adapter, not against leaderboards.
+A preliminary 100-question run showed a two-point gain, with eight answers fixed and six broken. That sample was too small to distinguish the change reliably from random variation. The 1,000-question test provides stronger evidence, although the measured improvement remains modest.
+
+**Interpretation and limitations.** The adapter improves accuracy by **2.7 percentage points**, but the result is specific to this model, training data and evaluation setup. Some changes are stylistic. For example, the adapter sometimes produces lowercase sentence starts or missing spaces after full stops ("rinsed with water.the car is then dried"). [HellaSwag](#the-dataset-and-the-sft-prompts) contains inconsistent formatting, and AutoModel's `SFTSingleTurnPreprocessor` concatenates context and ending token sequences without a separator.
+
+There is also a **training/evaluation formatting mismatch**: `compare_vllm.py` scores `ctx + " " + ending`, with a space added between the context and ending. This may influence the measured scores, but we have not measured the direction or magnitude of that effect. The prompts also differ from standard lm-eval HellaSwag prompts, which include an activity-label prefix. The useful comparison here is therefore **base versus adapter under the same procedure**, not either score against a leaderboard.
 
 ## Under the hood
 
-Two explanations for readers who want to know what the recipe does and what happens inside a training step. Nothing here is needed to run the steps.
+This section explains the recipe and one optimiser step. You can complete the walkthrough without it.
 
 ### The recipe's settings, explained
 
-The full recipe is `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` in this repository. These are the settings that matter, and what each one does:
+The full recipe is `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml`. Its key settings are:
 
 | Setting | Value | What it does |
 |---|---|---|
@@ -489,9 +522,11 @@ The full recipe is `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` in
 
 ### Inside a training step: precision, FSDP2 and memory
 
-**Number formats.** The recipe sets no model dtype, so the frozen base weights load as they ship, in **bf16**: a 16-bit floating-point format with fp32's exponent range but far fewer digits of precision. It halves the memory, and the maths runs in it too. Two things stay in **fp32** because they're sensitive to rounding: the normalisation layers (`rms_norm: torch_fp32` in the recipe, `Float32RMSNorm` in the log) and a few small Mamba-2 parameters (`NemotronV3MambaFP32Params` in the log). The LoRA weights and their AdamW state are fp32 too, as in NVIDIA's comparable Nemotron recipes. [VERIFY: run the check at the end of this section and state the result.]
+**Precision.** The recipe does not override the model dtype, so the base weights load in **BF16**. BF16 uses 16 bits per value, reducing weight memory compared with FP32 while retaining FP32's exponent range. The recipe uses FP32 for numerically sensitive normalisation (`rms_norm: torch_fp32`), and the log identifies small Mamba-2 parameters stored in FP32 (`NemotronV3MambaFP32Params`).
 
-**FSDP2 on one GPU.** FSDP2, PyTorch's Fully Sharded Data Parallel, splits weights and optimizer state across GPUs so each holds a slice. With one GPU there's nothing to split, and AutoModel skips it; the recipe keeps `strategy: fsdp2` so the same file scales to more GPUs unchanged. Likewise `ep_size: 1` keeps every expert on the one GPU, so tokens never cross to another device. The log says so, next to the other lines that shape a step:
+**Adapter precision is not yet verified.** Comparable NVIDIA recipes use FP32 LoRA weights and optimiser state, but the checkpoint from this run still needs inspection. [VERIFY: Run the dtype check below and report the result.]
+
+**FSDP2 on one GPU.** Fully Sharded Data Parallel normally divides model weights and optimiser state across GPUs. With a world size of one, AutoModel skips sharding. The recipe retains `strategy: fsdp2` for compatibility with larger configurations, while `ep_size: 1` keeps all experts on the local GPU. The log confirms this and shows other relevant settings:
 
 ```
 World size or FSDP mesh size is 1, skipping parallelization.
@@ -510,9 +545,9 @@ No clip_grad_norm.max_norm specified in config, using default value of 1.0
 6. Clip the combined gradient to a norm of 1.0.
 7. Let AdamW (betas 0.9/0.95, weight decay 0.1) update the adapter, at a learning rate that warms up over 2 steps to 1e-4 and decays along a cosine curve to 1e-5.
 
-**Memory.** About 60 GB of base weights, plus a small adapter and activations kept small by short examples and checkpointing: the run reported about 62 GiB of 128 GB. Longer sequences ([Next step](#next-step-sft-for-a-custom-use-case)) need more.
+**Memory use.** The roughly 60 GB base checkpoint dominates memory consumption. The adapter is small, and short inputs plus activation checkpointing limit activation memory. The run reported about **62 GiB** used out of the Spark's 128 GB unified pool. Longer sequences generally need more memory (see [Next step](#next-step-sft-for-a-custom-use-case)).
 
-**Check it yourself.** Inside the container, after a run, print the adapter's number formats and size, and confirm the fp32 modules and checkpoint wrappers in the log:
+**Verify the adapter dtype.** After training, run the following **inside `lightning-lora`**. It prints the adapter tensor types and parameter count and looks for FP32 modules and checkpoint wrappers in the log:
 
 ```bash
 python3 - <<'PY'
@@ -527,7 +562,7 @@ PY
 grep -m3 -E "Float32RMSNorm|MambaFP32Params|CheckpointWrapper" /shared/logs/lightning-200.log
 ```
 
-If the formats show `torch.float32`, the adapter trained in fp32 as described.
+If the checkpoint tensors are `torch.float32`, that confirms the **saved adapter dtype**. It does not, by itself, prove the dtype used for every intermediate computation or optimiser state.
 
 ## If it fails
 
@@ -558,7 +593,7 @@ Serving and evaluation:
 
 ## Next step: SFT for a custom use case
 
-Everything above transfers to your own data. Swap the recipe's dataset block for NVIDIA's JSONL prompt/completion class, the one its Nemotron "customizer" recipes use. Each line of the file is `{"prompt": "...", "completion": "..."}`:
+To adapt this workflow to your own task, replace the HellaSwag dataset with NVIDIA's column-mapped JSONL instruction dataset. Its records use the form `{"prompt": "...", "completion": "..."}`. Replace the recipe's `dataset` block with:
 
 ```yaml
 dataset:
@@ -574,7 +609,7 @@ dataset:
   truncation: longest_first
 ```
 
-`answer_only_loss_mask: true` does for your completions what the HellaSwag class did for the endings. Replace the `validation_dataset` block the same way, pointing at a held-out file (`split` is ignored for local files, which always load as a single split):
+`answer_only_loss_mask: true` excludes prompt tokens from the loss, as the HellaSwag dataset does with its context tokens. Point `validation_dataset` at a separate held-out JSONL file. For local files, `split` is ignored because the file loads as one split:
 
 ```yaml
 validation_dataset:
@@ -590,15 +625,19 @@ validation_dataset:
   truncation: longest_first
 ```
 
-Both blocks are in `configs/custom-dataset-block.yaml`. Two things to know. By default (`use_hf_chat_template: false`) the class trains on plain text, `prompt + completion` with nothing in between, exactly as the HellaSwag class did, so end each prompt with the separator you want the model to learn (a newline, say); set `use_hf_chat_template: true` to train in the tokenizer's chat format instead, and then test through the chat endpoint rather than `/v1/completions`. And run 20 steps first: we haven't tested this swap on the Lightning recipe yet, and longer sequences use more memory than HellaSwag.
+Both blocks are available in `configs/custom-dataset-block.yaml`.
 
-Our candidate is puzzle-style reasoning data from the Kaggle Nemotron reasoning challenge. HellaSwag is something the base model already does well; puzzles are where it's weaker, so the gain should be larger and more useful. The workflow is the same three steps: train, serve with vLLM, compare base against adapter on held-out data. There's headroom too: 62 GiB of 128 GB leaves room for the longer sequences real tasks bring.
+**Formatting matters.** With the default `use_hf_chat_template: false`, the dataset joins `prompt + completion` without inserting a separator. Include any intended separator, such as a newline, at the end of each prompt. Alternatively, use `use_hf_chat_template: true` to format examples using the tokenizer's chat template, then evaluate through a chat endpoint rather than `/v1/completions`.
 
-Three things to take from this run:
+**Test before scaling up.** This dataset substitution has not yet been tested against the Lightning recipe used here. Begin with 20 steps and monitor memory; 2,048-token sequences can require substantially more memory than the short HellaSwag examples.
 
-- **A 30B MoE model fine-tunes on one Spark**, with NVIDIA's recipe and container unchanged, because LoRA keeps the 60 GB base frozen.
-- **Loss shows it learned; a paired comparison on enough held-out data shows how much.** 100 questions couldn't tell; 1,000 could.
-- **Fine-tuning learns everything in the data, formatting included.** Read your model's free text, not only its scores.
+A possible next experiment is puzzle-style reasoning data from the Kaggle Nemotron reasoning challenge. We expect it to be a more demanding task for the base model than HellaSwag, but whether fine-tuning improves performance remains to be tested. The evaluation principle stays the same: **train, serve, and compare on unseen examples**. The 62 GiB measured here leaves some capacity for longer sequences, but memory use must be measured again for the new dataset.
+
+**Key takeaways:**
+
+- **One DGX Spark can LoRA fine-tune a 30B MoE model** using NVIDIA's existing container and recipe, with the base weights frozen.
+- **Validation loss and task accuracy answer different questions.** A paired test on 1,000 held-out questions provided clearer evidence than the initial 100-question check.
+- **Data formatting affects model behaviour.** Inspect free-text outputs as well as accuracy, especially when training and evaluation use different separators.
 
 ## Files in this repository
 
@@ -629,4 +668,4 @@ Three things to take from this run:
 - NVIDIA NeMo Customizer, customization concepts (LoRA as the recommended starting point): https://docs.nvidia.com/nemo/microservices/latest/customizer/about.html
 - Arm, PyTorch fine-tuning on DGX Spark, testing with vLLM (the inspiration for the evaluation): https://learn.arm.com/learning-paths/laptops-and-desktops/pytorch-finetuning-on-spark/4-testing/
 
-*Licences: the model is released under OpenMDW-1.1; the AutoModel container image is covered by the NVIDIA Software License Agreement and Product-Specific Terms for NVIDIA AI Products; HellaSwag is MIT-licensed. All measurements come from runs on one DGX Spark (GB10) on 2026-10-14.*
+*Licences: the model uses OpenMDW-1.1; the AutoModel container is subject to the NVIDIA Software License Agreement and the Product-Specific Terms for NVIDIA AI Products; HellaSwag is MIT-licensed. Measurements were collected on one DGX Spark (GB10) on 14 October 2026.*
