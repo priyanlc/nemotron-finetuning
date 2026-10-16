@@ -9,7 +9,7 @@ Fine-tuning experiments on NVIDIA's Nemotron models, run end to end on real hard
 | [lightning-30b-lora-hellaswag-dgx-spark](experiments/lightning-30b-lora-hellaswag-dgx-spark/) | Nemotron 3.5 Lightning 30B-A3B | LoRA r8/α32, 200 steps | HellaSwag | DGX Spark (GB10, 128 GB) | acc_norm 0.644 → 0.671 (+2.7 points, p ≈ 0.02) on 1,000 held-out questions | 2026-10-14 | measured |
 | nano-30b-lora-hellaswag-runpod-2xa100 | Nemotron 3 Nano 30B-A3B | LoRA r8/α32, experts split over 2 GPUs | HellaSwag | RunPod, 2 × A100 80 GB | validation loss 2.517 | 2026-10-09 | measured, write-up pending |
 | nano-8b-lora-squad-runpod-a6000 | Llama-3.1-Nemotron-Nano-8B-v1 | LoRA r8/α32, 100 steps | SQuAD | RunPod, 1 × RTX A6000 48 GB | validation loss 4.66 → 0.189 | 2026-10-07 | measured, write-up pending |
-| lightning-30b-lora-reasoning-puzzles-dgx-spark | Nemotron 3.5 Lightning 30B-A3B | LoRA on JSONL prompt/completion data | Kaggle Nemotron reasoning puzzles | DGX Spark | — | — | planned |
+| [lightning-30b-lora-reasoning-puzzles-dgx-spark](experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/) | Nemotron 3.5 Lightning 30B-A3B | LoRA on JSONL prompt/completion data | Kaggle Nemotron reasoning puzzles | DGX Spark | — | — | planned |
 
 Status labels: `planned` (designed, not run) · `in progress` · `measured` (ran end to end, results committed) · `published` (a post about it is live) · `superseded` (replaced by a later experiment, which the row then links to). "Write-up pending" means the run is measured but its folder has not been written yet.
 

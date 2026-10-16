@@ -1,5 +1,5 @@
 # Replace the recipe's `dataset:` and `validation_dataset:` blocks with these two to
-# train on your own JSONL prompt/completion pairs (README, "Next step").
+# train on your own JSONL prompt/completion pairs (README.md, "Data").
 # Each line of a file: {"prompt": "...", "completion": "..."}.
 # `split` is ignored for local files, which always load as a single split.
 # By default (use_hf_chat_template: false) each example is plain text: prompt + completion, nothing in between.

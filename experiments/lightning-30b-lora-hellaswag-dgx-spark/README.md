@@ -496,6 +496,12 @@ A preliminary 100-question run showed a two-point gain, with eight answers fixed
 
 There is also a **training/evaluation formatting mismatch**: `compare_vllm.py` scores `ctx + " " + ending`, with a space added between the context and ending. This may influence the measured scores, but we have not measured the direction or magnitude of that effect. The prompts also differ from standard lm-eval HellaSwag prompts, which include an activity-label prefix. The useful comparison here is therefore **base versus adapter under the same procedure**, not either score against a leaderboard.
 
+**In short:**
+
+- **One DGX Spark can LoRA fine-tune a 30B MoE model** using NVIDIA's existing container and recipe, with the base weights frozen.
+- **Validation loss and task accuracy answer different questions.** A paired test on 1,000 held-out questions provided clearer evidence than the initial 100-question check.
+- **Data formatting affects model behaviour.** Inspect free-text outputs as well as accuracy, especially when training and evaluation use different separators.
+
 ## Under the hood
 
 What the recipe's settings do, and what happens inside one optimiser step (precision, FSDP2 on a single GPU, activation checkpointing, memory, and how to check the adapter's dtype) are explained in [under-the-hood.md](under-the-hood.md). You can complete the walkthrough without it.
@@ -530,35 +536,7 @@ Serving and evaluation:
 
 ## Next step: SFT for a custom use case
 
-To adapt this workflow to your own task, replace the HellaSwag dataset with NVIDIA's column-mapped JSONL instruction dataset. Its records use the form `{"prompt": "...", "completion": "..."}`. Replace the recipe's `dataset` block with:
-
-```yaml
-dataset:
-  _target_: nemo_automodel.components.datasets.llm.column_mapped_text_instruction_dataset.ColumnMappedTextInstructionDataset
-  path_or_dataset_id: /shared/data/train.jsonl
-  split: train
-  column_mapping:
-    question: prompt
-    answer: completion
-  seq_length: 2048
-  answer_only_loss_mask: true
-  padding: do_not_pad
-  truncation: longest_first
-```
-
-`answer_only_loss_mask: true` excludes prompt tokens from the loss, as the HellaSwag dataset does with its context tokens. For validation, repeat the block as `validation_dataset` with `path_or_dataset_id: /shared/data/val.jsonl`, a separate held-out file; keep `split: train`, which is ignored for local files because the file loads as one split. Both blocks are written out in `configs/custom-dataset-block.yaml`.
-
-**Formatting matters.** With the default `use_hf_chat_template: false`, the dataset joins `prompt + completion` without inserting a separator. Include any intended separator, such as a newline, at the end of each prompt. Alternatively, use `use_hf_chat_template: true` to format examples using the tokenizer's chat template, then evaluate through a chat endpoint rather than `/v1/completions`.
-
-**Test before scaling up.** This dataset substitution has not yet been tested against the Lightning recipe used here. Begin with 20 steps and monitor memory; 2,048-token sequences can require substantially more memory than the short HellaSwag examples.
-
-A possible next experiment is puzzle-style reasoning data from the Kaggle Nemotron reasoning challenge. We expect it to be a more demanding task for the base model than HellaSwag, but whether fine-tuning improves performance remains to be tested. The evaluation principle stays the same: **train, serve, and compare on unseen examples**. The 62 GiB measured here leaves some capacity for longer sequences, but memory use must be measured again for the new dataset.
-
-**Key takeaways:**
-
-- **One DGX Spark can LoRA fine-tune a 30B MoE model** using NVIDIA's existing container and recipe, with the base weights frozen.
-- **Validation loss and task accuracy answer different questions.** A paired test on 1,000 held-out questions provided clearer evidence than the initial 100-question check.
-- **Data formatting affects model behaviour.** Inspect free-text outputs as well as accuracy, especially when training and evaluation use different separators.
+To train on your own data, swap the HellaSwag dataset for NVIDIA's column-mapped JSONL dataset (`{"prompt": …, "completion": …}`) and point `validation_dataset` at a held-out file. The config blocks, the notes on separators and memory, and the plan for the next run are in the planned follow-up experiment, [lightning-30b-lora-reasoning-puzzles-dgx-spark](../lightning-30b-lora-reasoning-puzzles-dgx-spark/README.md); they have not been tested against this recipe yet. Begin any new dataset with 20 steps and watch memory: 2,048-token sequences can need far more than the short HellaSwag examples.
 
 ## Files in this experiment
 
@@ -568,7 +546,6 @@ A possible next experiment is puzzle-style reasoning data from the Kaggle Nemotr
 | `under-the-hood.md` | The recipe's settings and one optimiser step, explained: precision, FSDP2 on one GPU, memory, the adapter dtype check. |
 | `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` | NVIDIA's recipe, verbatim from AutoModel's main branch (Apache-2.0; NVIDIA's header kept). |
 | `configs/validation-block.yaml` | The validation block appended in step 6. |
-| `configs/custom-dataset-block.yaml` | The JSONL prompt/completion dataset and validation blocks from "Next step". |
 | `../../tools/compare_vllm.py` | The evaluation script (step 11), shared by the repository's experiments; `../../tools/README.md` explains its method and options. |
 | `results/validation-loss.csv` | Validation loss and learning rate at each check of the 200-step run. |
 | `results/hellaswag-1000.csv` | Base against adapter on 1,000 held-out HellaSwag questions. |
