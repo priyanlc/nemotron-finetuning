@@ -1,6 +1,6 @@
 # nemotron-finetuning
 
-Fine-tuning experiments on NVIDIA's Nemotron models, run end to end on real hardware: so far one DGX Spark and RunPod GPUs. Each experiment uses NVIDIA's NeMo AutoModel recipes and containers to train a LoRA adapter, then measures it against the base model, so far through a vLLM server. Every number in this repository comes from a log, and each experiment folder is a self-contained, reproducible guide: the commands in order, the configs, the results, and what they do and don't show.
+Fine-tuning experiments on NVIDIA's Nemotron models, run end to end on real hardware: so far one DGX Spark and RunPod GPUs. Each experiment uses NVIDIA's NeMo AutoModel recipes and containers to fine-tune a model, then measures it against the base model, so far through a vLLM server. Every number in this repository comes from a log, and each experiment folder is a self-contained, reproducible guide: the commands in order, the configs, the results, and what they do and don't show.
 
 ## Experiments
 
