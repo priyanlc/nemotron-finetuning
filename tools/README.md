@@ -52,4 +52,50 @@ Two things to know before comparing numbers with anything else. The space in `ct
 | `--prompts` | | A text file with one prompt per line for the side-by-side examples; otherwise HellaSwag contexts after the scored rows are used. |
 | `--out` | `/shared/logs/compare_vllm.json` | Where the per-question results are written. |
 
-HellaSwag is the only scorer today. Other tasks will add their own, selected by a `--task` option, when an experiment needs them.
+`compare_puzzles.py` below scores the Kaggle reasoning puzzles by generation. The two scorers may be folded into one script behind a `--task` option later.
+
+## compare_puzzles.py
+
+`compare_puzzles.py` compares a base model and a LoRA adapter served by one vLLM server on the Kaggle reasoning puzzles, by generation. For each row of a JSONL file (`{"id", "category", "prompt", "answer"}`, as `experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/make_puzzle_jsonl.py` writes `test.jsonl`) it renders the prompt with the model's chat template, asks `/v1/completions` for a greedy continuation from both model names, extracts the last `\boxed{}` and compares it with the expected answer the way the Kaggle metric does. It reports accuracy per category, the answers the adapter fixed and broke, an exact McNemar test and a paired 95% interval for the gain. It needs the standard library plus `transformers` for the tokenizer, both in NVIDIA's AutoModel container. The [reasoning-puzzles guide](../experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/README.md#step-11-time-the-scorer-on-12-puzzles) shows it in use.
+
+```bash
+cp ~/nemo-shared/nemotron-finetuning/tools/compare_puzzles.py ~/nemo-shared/
+docker exec -it lightning-lora python3 /shared/compare_puzzles.py --selftest     # checks the statistics; no server needed
+docker exec -it lightning-lora python3 /shared/compare_puzzles.py --n 12 --out /shared/<experiment>/logs/compare-12.csv
+docker exec -it lightning-lora python3 /shared/compare_puzzles.py --n 0 --out /shared/<experiment>/logs/compare-600.csv   # all rows; hours
+```
+
+### How the scoring works
+
+**The prompt** is the user message rendered with `apply_chat_template(..., add_generation_prompt=True, enable_thinking=True)`, which for Lightning ends in `<|im_start|>assistant\n<think>\n`. It goes to the completions endpoint, not the chat endpoint, so the text the server sees is exactly the prefix that training extended. The request asks for `min(7680, 8192 - prompt tokens)` tokens at temperature 0, the competition's budget and decoding.
+
+**The answer** is the last non-empty `\boxed{...}` in the generation (nested braces handled for the final one). It matches the expected answer if both parse as numbers within 1% relative tolerance, or if the strings are equal ignoring case and surrounding whitespace. A missing box, or a generation cut off by the token limit, counts as wrong. The matching function:
+
+```python
+def answers_match(pred, gold):
+    if pred is None:
+        return False
+    try:
+        return math.isclose(float(pred), float(gold), rel_tol=1e-2, abs_tol=1e-5)
+    except (ValueError, TypeError):
+        pass
+    return pred.strip().lower() == gold.strip().lower()
+```
+
+**The statistics** use only the puzzles the two models disagree on. With b answers fixed by the adapter, c broken, and n puzzles scored: the gain is (b − c) / n; its Wald standard error is sqrt(b + c − (b − c)² / n) / n, and the 95% interval is the gain ± 1.96 standard errors; the exact McNemar p-value is the two-sided binomial probability of a split at least as uneven as b against c among the b + c discordant pairs when fixes and breaks are equally likely. `--selftest` checks them on the HellaSwag run's 80 fixed and 53 broken of 1,000: gain +0.027, interval +0.004 to +0.050, p = 0.024.
+
+**The subset** chosen by `--n` is every k-th row of the file, so that each category is represented when the file is grouped by category: `--n 12` scores 2 per category, `--n 300` 50. `--n 0` scores every row.
+
+### Options
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--url` | `http://localhost:8000/v1` | The vLLM server. |
+| `--base-name`, `--adapter-name` | `lightning-base`, `lightning-puzzles` | The two served model names; they must match the server's `--served-model-name` and `--lora-modules`. |
+| `--data` | `/shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/test.jsonl` | The puzzles to score. |
+| `--n` | `0` | Rows to score, spread over the file; `0` scores all of them. |
+| `--max-tokens` | `7680` | The generation budget, capped per request at 8,192 minus the prompt's tokens. |
+| `--concurrency` | `16` | Requests in flight at once; vLLM batches them. |
+| `--out` | `/shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare_puzzles.csv` | The per-row CSV (prediction, correctness, token count and finish reason for both models). A `.json` summary and a `-generations.jsonl` file with every generation are written beside it. |
+| `--selftest` | | Checks the statistics and the answer functions without a server. |
+

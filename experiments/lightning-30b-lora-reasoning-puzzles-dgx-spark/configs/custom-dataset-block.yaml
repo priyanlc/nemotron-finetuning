@@ -1,30 +1,35 @@
-# Replace the recipe's `dataset:` and `validation_dataset:` blocks with these two to
-# train on your own JSONL prompt/completion pairs (README.md, "Data").
-# Each line of a file: {"prompt": "...", "completion": "..."}.
+# Appended to a copy of nemotron_nano_v3_5_lightning_singlegpu_lora.yaml after its HellaSwag `dataset:` block has
+# been deleted (README.md, step 7). Trains on the JSONL files that data/make_puzzle_jsonl.py writes, with the
+# tokenizer's chat template, the loss on the assistant turn only, and validation on val.jsonl.
 # `split` is ignored for local files, which always load as a single split.
-# By default (use_hf_chat_template: false) each example is plain text: prompt + completion, nothing in between.
-# Untested on the Lightning recipe so far: run 20 steps first.
+# Not yet run on the Lightning recipe: the decode check and the 20-step run of step 8 come first.
 
 dataset:
   _target_: nemo_automodel.components.datasets.llm.column_mapped_text_instruction_dataset.ColumnMappedTextInstructionDataset
-  path_or_dataset_id: /shared/data/train.jsonl
+  path_or_dataset_id: /shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/train.jsonl
   split: train
   column_mapping:
     question: prompt
     answer: completion
-  seq_length: 2048
+  use_hf_chat_template: true
   answer_only_loss_mask: true
+  seq_length: 2048
   padding: do_not_pad
   truncation: longest_first
 
 validation_dataset:
   _target_: nemo_automodel.components.datasets.llm.column_mapped_text_instruction_dataset.ColumnMappedTextInstructionDataset
-  path_or_dataset_id: /shared/data/val.jsonl
+  path_or_dataset_id: /shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/val.jsonl
   split: train
   column_mapping:
     question: prompt
     answer: completion
-  seq_length: 2048
+  use_hf_chat_template: true
   answer_only_loss_mask: true
+  seq_length: 2048
   padding: do_not_pad
   truncation: longest_first
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater

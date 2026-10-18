@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1070" viewBox="0 0 1920 1070" role="img" aria-label="One puzzle, one training sequence, one served prompt">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#333333"/></marker></defs>
+<rect width="1920" height="1070" fill="#ffffff"/>
+<text x="48" y="66" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#1f1f1f" text-anchor="start">One puzzle, one training sequence, one served prompt</text>
+<text x="48" y="108" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">Row ca4d10f5 of train.jsonl as the Lightning chat template renders it. The training text begins with exactly what the scorer sends at evaluation.</text>
+<rect x="330" y="150" width="1070" height="90" rx="10" fill="#eef3fb" stroke="#2f4f7f" stroke-width="2.5"/>
+<text x="300" y="203.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#1f1f1f" text-anchor="end">system turn</text>
+<text x="354" y="188" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">&lt;|im_start|&gt;system</text>
+<text x="354" y="218" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">&lt;|im_end|&gt;</text>
+<text x="1376" y="188" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#5a5a5a" text-anchor="end">empty: the template adds it whenever no system</text>
+<text x="1376" y="216" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#5a5a5a" text-anchor="end">message is given, at training and at inference alike</text>
+<rect x="330" y="252" width="1070" height="380" rx="10" fill="#eef3fb" stroke="#2f4f7f" stroke-width="2.5"/>
+<text x="300" y="450.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#1f1f1f" text-anchor="end">user turn</text>
+<text x="354" y="290" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">&lt;|im_start|&gt;user</text>
+<text x="354" y="320" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">In Alice's Wonderland, the gravitational constant has been secretly changed.</text>
+<text x="354" y="350" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">Here are some example observations:</text>
+<text x="354" y="380" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">For t = 1.69s, distance = 9.47 m</text>
+<text x="354" y="410" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">For t = 1.58s, distance = 8.28 m</text>
+<text x="354" y="440" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">For t = 2.26s, distance = 16.93 m</text>
+<text x="354" y="470" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">For t = 3.49s, distance = 40.38 m</text>
+<text x="354" y="500" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">Now, determine the falling distance for t = 2.81s given d = 0.5*g*t^2.</text>
+<text x="354" y="530" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">Please put your final answer inside `\boxed{}`.</text>
+<text x="354" y="560" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">For example: `\boxed{your answer}`</text>
+<text x="354" y="590" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">&lt;|im_end|&gt;</text>
+<text x="1376" y="410" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#5a5a5a" text-anchor="end">the puzzle, as train.csv gives it</text>
+<text x="1376" y="560" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#5a5a5a" text-anchor="end">the boxed-answer instruction the script adds</text>
+<text x="1376" y="590" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#5a5a5a" text-anchor="end">(a cipher prompt also gets the vocabulary hint, just before it)</text>
+<rect x="330" y="644" width="1070" height="90" rx="10" fill="#eef3fb" stroke="#2f4f7f" stroke-width="2.5"/>
+<text x="300" y="697.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#1f1f1f" text-anchor="end">assistant turn</text>
+<text x="354" y="682" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">&lt;|im_start|&gt;assistant</text>
+<text x="354" y="712" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="700" fill="#2e7d32" text-anchor="start">&lt;think&gt;</text>
+<text x="1376" y="696" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#5a5a5a" text-anchor="end">the served prompt ends here, with an open &lt;think&gt;</text>
+<rect x="330" y="746" width="1070" height="200" rx="10" fill="#e6f4e7" stroke="#2e7d32" stroke-width="2.5"/>
+<text x="300" y="854.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#1f1f1f" text-anchor="end"></text>
+<text x="354" y="784" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">Using d = 0.5*g*t^2: g = 2d/t^2 = 2*9.47/1.69^2 = 6.6314.</text>
+<text x="354" y="814" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">Apply to find d for the new t. Answer: 26.18</text>
+<text x="354" y="844" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="700" fill="#2e7d32" text-anchor="start">&lt;/think&gt;</text>
+<text x="354" y="874" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="700" fill="#2e7d32" text-anchor="start">\boxed{26.18}</text>
+<text x="354" y="904" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">&lt;|im_end|&gt;</text>
+<text x="1376" y="874" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#5a5a5a" text-anchor="end">the completion from train.jsonl, after its opening &lt;think&gt;</text>
+<path d="M1430 150 h 14 v 584 h -14" fill="none" stroke="#2f4f7f" stroke-width="3"/>
+<path d="M1430 746 h 14 v 200 h -14" fill="none" stroke="#2e7d32" stroke-width="3"/>
+<text x="1470" y="382.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#2f4f7f" text-anchor="start">the served prompt</text>
+<text x="1470" y="422.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">what the scorer sends: the user</text>
+<text x="1470" y="452.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">message rendered with the generation</text>
+<text x="1470" y="482.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">prompt and thinking on, through</text>
+<text x="1470" y="512.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">/v1/completions, temperature 0,</text>
+<text x="1470" y="542.0" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">up to 7,680 new tokens</text>
+<text x="1470" y="790" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#2e7d32" text-anchor="start">the trained span</text>
+<text x="1470" y="830" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">the completion's tail plus &lt;|im_end|&gt;:</text>
+<text x="1470" y="860" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">answer_only_loss_mask puts the loss on</text>
+<text x="1470" y="890" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">these tokens and nowhere else</text>
+<text x="48" y="996" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" font-weight="400" fill="#1f1f1f" text-anchor="start">Training text = served prompt + completion tail + &lt;|im_end|&gt;. Step 4 checks it on all 9,500 rows; step 8 repeats the check inside the container,</text>
+<text x="48" y="1030" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" font-weight="400" fill="#1f1f1f" text-anchor="start">against AutoModel's dataset class and its loss mask. With the dataset's default, use_hf_chat_template: false, a space would follow the prompt instead.</text>
+</svg>

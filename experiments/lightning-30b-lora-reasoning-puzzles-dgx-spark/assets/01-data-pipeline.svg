@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1000" viewBox="0 0 1920 1000" role="img" aria-label="How train.csv becomes three JSONL files">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#333333"/></marker></defs>
+<rect width="1920" height="1000" fill="#ffffff"/>
+<text x="48" y="66" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#1f1f1f" text-anchor="start">How train.csv becomes three JSONL files</text>
+<text x="48" y="108" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">data/make_puzzle_jsonl.py on the laptop, in the experiment's virtual environment (steps 2 to 4); the copy to the Spark is step 5</text>
+<rect x="48" y="160" width="260" height="340" rx="14" fill="#dce8f8" stroke="#2f4f7f" stroke-width="2.5"/>
+<text x="68" y="208" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="30" font-weight="700" fill="#1f1f1f" text-anchor="start">train.csv</text>
+<text x="68" y="260" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">9,500 puzzles</text>
+<text x="68" y="296" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">id, prompt, answer</text>
+<text x="68" y="332" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">six categories,</text>
+<text x="68" y="368" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">about 1,580 each</text>
+<text x="68" y="420" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">Kaggle, CC BY 4.0</text>
+<text x="68" y="452" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">stays out of git</text>
+<rect x="360" y="160" width="380" height="340" rx="14" fill="#f3f3f3" stroke="#333333" stroke-width="2.5"/>
+<text x="380" y="206" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1f1f" text-anchor="start">1 · classify</text>
+<text x="380" y="238" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">by keywords in the prompt</text>
+<text x="380" y="278" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">bit_ops</text>
+<text x="720" y="278" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="end">1,602</text>
+<text x="380" y="314" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">cipher</text>
+<text x="720" y="314" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="end">1,576</text>
+<text x="380" y="350" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">gravity</text>
+<text x="720" y="350" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="end">1,597</text>
+<text x="380" y="386" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">numeral</text>
+<text x="720" y="386" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="end">1,576</text>
+<text x="380" y="422" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">symbol</text>
+<text x="720" y="422" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="end">1,555</text>
+<text x="380" y="458" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">unit_conv</text>
+<text x="720" y="458" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="end">1,594</text>
+<rect x="792" y="160" width="470" height="340" rx="14" fill="#f3f3f3" stroke="#333333" stroke-width="2.5"/>
+<text x="812" y="206" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1f1f" text-anchor="start">2 · split with fixed seeds</text>
+<text x="812" y="264" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">val: 10 per category, seed 0</text>
+<text x="1242" y="264" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="end">60</text>
+<text x="812" y="308" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">test: 100 per category, seed 1</text>
+<text x="1242" y="308" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="end">600</text>
+<text x="812" y="352" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">train: the rest, shuffled, seed 2</text>
+<text x="1242" y="352" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="end">8,840</text>
+<text x="812" y="420" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">no puzzle lands in two files;</text>
+<text x="812" y="452" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">rerunning gives the same files</text>
+<rect x="1314" y="160" width="558" height="340" rx="14" fill="#f3f3f3" stroke="#333333" stroke-width="2.5"/>
+<text x="1334" y="206" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1f1f" text-anchor="start">3 · build each row</text>
+<text x="1334" y="260" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#1f1f1f" text-anchor="start">prompt</text>
+<text x="1432" y="260" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">= puzzle + boxed-answer instruction</text>
+<text x="1432" y="294" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">(+ the vocabulary hint, ciphers only)</text>
+<text x="1334" y="344" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#1f1f1f" text-anchor="start">completion</text>
+<text x="1354" y="378" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">&lt;think&gt; trace &lt;/think&gt; \boxed{answer}</text>
+<text x="1334" y="426" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">trace computed from the puzzle's examples</text>
+<text x="1334" y="456" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">where a rule can be read off, else a template</text>
+<line x1="314" y1="330.0" x2="352" y2="330.0" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="746" y1="330.0" x2="784" y2="330.0" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="1268" y1="330.0" x2="1306" y2="330.0" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="48" y="560" width="560" height="150" rx="14" fill="#dce8f8" stroke="#2f4f7f" stroke-width="2.5"/>
+<text x="68" y="610" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="30" font-weight="700" fill="#1f1f1f" text-anchor="start">train.jsonl</text>
+<text x="588" y="610" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="end">8,840 rows</text>
+<text x="68" y="664" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">the training set: 8 rows per optimiser step</text>
+<rect x="660" y="560" width="560" height="150" rx="14" fill="#dce8f8" stroke="#2f4f7f" stroke-width="2.5"/>
+<text x="680" y="610" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="30" font-weight="700" fill="#1f1f1f" text-anchor="start">val.jsonl</text>
+<text x="1200" y="610" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="end">60 rows</text>
+<text x="680" y="664" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">the [val] loss, every 20 steps</text>
+<rect x="1272" y="560" width="600" height="150" rx="14" fill="#dce8f8" stroke="#2f4f7f" stroke-width="2.5"/>
+<text x="1292" y="610" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="30" font-weight="700" fill="#1f1f1f" text-anchor="start">test.jsonl</text>
+<text x="1852" y="610" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="end">600 rows</text>
+<text x="1292" y="664" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">the scorer's puzzles, never trained on</text>
+<line x1="1593.0" y1="500" x2="1593.0" y2="530" stroke="#333333" stroke-width="2.5"/>
+<line x1="328.0" y1="530" x2="1593.0" y2="530" stroke="#333333" stroke-width="2.5"/>
+<line x1="328.0" y1="530" x2="328.0" y2="556" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="940.0" y1="530" x2="940.0" y2="556" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="1572.0" y1="530" x2="1572.0" y2="556" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="48" y="760" width="1140" height="190" rx="14" fill="#e6f4e7" stroke="#2e7d32" stroke-width="2.5"/>
+<text x="68" y="806" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1f1f" text-anchor="start">4 · check:</text>
+<text x="214" y="806" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="26" font-weight="700" fill="#2e7d32" text-anchor="start">python data/make_puzzle_jsonl.py --check</text>
+<text x="68" y="856" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" font-weight="400" fill="#1f1f1f" text-anchor="start">renders all 9,500 rows with the Lightning chat template, the way AutoModel will, and confirms that each</text>
+<text x="68" y="890" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" font-weight="400" fill="#1f1f1f" text-anchor="start">training sequence is the served prompt followed by the completion, byte for byte</text>
+<text x="68" y="928" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">longest sequence 492 tokens, mean 240: seq_length 2048 is a cap nothing reaches</text>
+<rect x="1240" y="760" width="632" height="190" rx="14" fill="#fdebd3" stroke="#9a6b2a" stroke-width="2.5"/>
+<text x="1260" y="806" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1f1f" text-anchor="start">5 · copy to the Spark with scp</text>
+<text x="1260" y="856" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="20" font-weight="400" fill="#1f1f1f" text-anchor="start">~/nemo-shared/lightning-30b-lora-</text>
+<text x="1260" y="884" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="20" font-weight="400" fill="#1f1f1f" text-anchor="start">reasoning-puzzles-dgx-spark/data/</text>
+<text x="1260" y="928" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">= /shared/…/data/ inside both containers</text>
+<line x1="328.0" y1="710" x2="328.0" y2="735" stroke="#333333" stroke-width="2.5"/>
+<line x1="940.0" y1="710" x2="940.0" y2="735" stroke="#333333" stroke-width="2.5"/>
+<line x1="1572.0" y1="710" x2="1572.0" y2="735" stroke="#333333" stroke-width="2.5"/>
+<line x1="328.0" y1="735" x2="1556" y2="735" stroke="#333333" stroke-width="2.5"/>
+<line x1="618" y1="735" x2="618" y2="756" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+<line x1="1556" y1="735" x2="1556" y2="756" stroke="#333333" stroke-width="2.5" marker-end="url(#arrow)"/>
+</svg>

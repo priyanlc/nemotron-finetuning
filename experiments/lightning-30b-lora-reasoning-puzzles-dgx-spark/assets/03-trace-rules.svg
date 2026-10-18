@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="820" viewBox="0 0 1920 820" role="img" aria-label="Which reasoning trace does a puzzle get?">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#333333"/></marker></defs>
+<rect width="1920" height="820" fill="#ffffff"/>
+<text x="48" y="66" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#1f1f1f" text-anchor="start">Which reasoning trace does a puzzle get?</text>
+<text x="48" y="108" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">train.jsonl, 8,840 rows: a trace computed from the puzzle's own examples and answer where a rule can be read off them, otherwise one fixed sentence per category</text>
+<text x="48" y="208" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="start">cipher</text>
+<rect x="250" y="180" width="460" height="44" rx="6" fill="#e4e4e4" stroke="#9a9a9a" stroke-width="1.5"/>
+<rect x="250" y="180" width="460.0" height="44" rx="6" fill="#e6f4e7" stroke="#2e7d32" stroke-width="2"/>
+<text x="730" y="209" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#2e7d32" text-anchor="start">1,466 of 1,466</text>
+<text x="930" y="190" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">substitution map read off the example pairs, completed from the answer where a</text>
+<text x="930" y="217" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">letter is unmapped; the first word decrypted character by character, then the</text>
+<text x="930" y="244" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">whole text, then the answer</text>
+<text x="48" y="308" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="start">gravity</text>
+<rect x="250" y="280" width="460" height="44" rx="6" fill="#e4e4e4" stroke="#9a9a9a" stroke-width="1.5"/>
+<rect x="250" y="280" width="460.0" height="44" rx="6" fill="#e6f4e7" stroke="#2e7d32" stroke-width="2"/>
+<text x="730" y="309" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#2e7d32" text-anchor="start">1,487 of 1,487</text>
+<text x="930" y="290" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">g = 2d / t² from the first observation, to four decimals, then the instruction to</text>
+<text x="930" y="317" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">apply it to the new time, and the answer</text>
+<text x="48" y="408" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="start">symbol</text>
+<rect x="250" y="380" width="460" height="44" rx="6" fill="#e4e4e4" stroke="#9a9a9a" stroke-width="1.5"/>
+<rect x="250" y="380" width="71.30795847750865" height="44" rx="6" fill="#e6f4e7" stroke="#2e7d32" stroke-width="2"/>
+<text x="730" y="409" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#2e7d32" text-anchor="start">224 of 1,445</text>
+<text x="930" y="390" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">two integers joined by one symbol, and the answer equals one of a + b, a − b,</text>
+<text x="930" y="417" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">b − a, a × b, a // b, the digits of a then b, or the sum of all digits:</text>
+<text x="930" y="444" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">that operation, named and computed</text>
+<text x="48" y="508" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="start">bit_ops</text>
+<rect x="250" y="480" width="460" height="44" rx="6" fill="#e4e4e4" stroke="#9a9a9a" stroke-width="1.5"/>
+<rect x="250" y="480" width="28.364611260053618" height="44" rx="6" fill="#e6f4e7" stroke="#2e7d32" stroke-width="2"/>
+<text x="730" y="509" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#2e7d32" text-anchor="start">92 of 1,492</text>
+<text x="930" y="490" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">per output bit, the simplest function of the input bits fitting every pair</text>
+<text x="930" y="517" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">(a constant, a bit, its NOT, the XOR, AND or OR of two bits), applied to the</text>
+<text x="930" y="544" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">new input; kept only if the result is the answer</text>
+<text x="48" y="608" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="start">unit_conv</text>
+<rect x="250" y="580" width="460" height="44" rx="6" fill="#e4e4e4" stroke="#9a9a9a" stroke-width="1.5"/>
+<text x="730" y="609" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#5a5a5a" text-anchor="start">0 of 1,484</text>
+<text x="930" y="590" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">a factor trace exists in the script but expects 'number unit -&gt; number';</text>
+<text x="930" y="617" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">these prompts read '7.27 m becomes 13.65', so every row gets the template</text>
+<text x="48" y="708" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="26" font-weight="700" fill="#1f1f1f" text-anchor="start">numeral</text>
+<rect x="250" y="680" width="460" height="44" rx="6" fill="#e4e4e4" stroke="#9a9a9a" stroke-width="1.5"/>
+<text x="730" y="709" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#5a5a5a" text-anchor="start">0 of 1,466</text>
+<text x="930" y="690" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#1f1f1f" text-anchor="start">no computed trace: every row gets the template</text>
+<rect x="250" y="772" width="36" height="24" rx="4" fill="#e6f4e7" stroke="#2e7d32" stroke-width="2"/>
+<text x="298" y="791" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">trace computed from the puzzle's examples and answer</text>
+<rect x="910" y="772" width="36" height="24" rx="4" fill="#e4e4e4" stroke="#9a9a9a" stroke-width="1.5"/>
+<text x="958" y="791" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#1f1f1f" text-anchor="start">the category's one-sentence template</text>
+</svg>

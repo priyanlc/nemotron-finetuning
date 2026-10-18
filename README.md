@@ -9,7 +9,7 @@ Fine-tuning experiments on NVIDIA's Nemotron models, run end to end on real hard
 | [lightning-30b-lora-hellaswag-dgx-spark](experiments/lightning-30b-lora-hellaswag-dgx-spark/) | Nemotron 3.5 Lightning 30B-A3B | LoRA r8/α32, 200 steps | HellaSwag | DGX Spark (GB10, 128 GB) | acc_norm 0.644 → 0.671 (+2.7 points, p ≈ 0.02) on 1,000 held-out questions | 2026-10-14 | measured |
 | nano-30b-lora-hellaswag-runpod-2xa100 | Nemotron 3 Nano 30B-A3B | LoRA r8/α32, experts split over 2 GPUs | HellaSwag | RunPod, 2 × A100 80 GB | validation loss 2.517 | 2026-10-09 | measured, write-up pending |
 | nano-8b-lora-squad-runpod-a6000 | Llama-3.1-Nemotron-Nano-8B-v1 | LoRA r8/α32, 100 steps | SQuAD | RunPod, 1 × RTX A6000 48 GB | validation loss 4.66 → 0.189 | 2026-10-07 | measured, write-up pending |
-| [lightning-30b-lora-reasoning-puzzles-dgx-spark](experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/) | Nemotron 3.5 Lightning 30B-A3B | LoRA on JSONL prompt/completion data | Kaggle Nemotron reasoning puzzles | DGX Spark | — | — | planned |
+| [lightning-30b-lora-reasoning-puzzles-dgx-spark](experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/) | Nemotron 3.5 Lightning 30B-A3B | LoRA r8/α32, 200 steps, on JSONL prompt/completion data with reasoning traces | Kaggle Nemotron reasoning puzzles (8,840 train, 600 held out) | DGX Spark | — | — | in progress: data built and checked 2026-10-18, not trained yet |
 
 Status labels: `planned` (designed, not run) · `in progress` · `measured` (ran end to end, results committed) · `published` (a post about it is live) · `superseded` (replaced by a later experiment, which the row then links to). "Write-up pending" means the run is measured but its folder has not been written yet.
 
@@ -19,7 +19,8 @@ Status labels: `planned` (designed, not run) · `in progress` · `measured` (ran
 
 | Path | What it is |
 |---|---|
-| [`tools/compare_vllm.py`](tools/compare_vllm.py) | Compares a base model and a LoRA adapter served by one vLLM server: greedy completions side by side, then HellaSwag accuracy by log-likelihood of the four endings (acc and acc_norm, as in lm-evaluation-harness). Standard library plus `datasets`. Method, scoring function and options: [`tools/README.md`](tools/README.md). Other tasks will add their own scorers. |
+| [`tools/compare_vllm.py`](tools/compare_vllm.py) | Compares a base model and a LoRA adapter served by one vLLM server: greedy completions side by side, then HellaSwag accuracy by log-likelihood of the four endings (acc and acc_norm, as in lm-evaluation-harness). Standard library plus `datasets`. Method, scoring function and options: [`tools/README.md`](tools/README.md). |
+| [`tools/compare_puzzles.py`](tools/compare_puzzles.py) | The same comparison for the Kaggle reasoning puzzles, by generation: greedy answers from both model names with the competition's 7,680-token budget, the last `\boxed{}` scored as the Kaggle metric does, accuracy per category, answers fixed and broken, an exact McNemar test and a paired interval. Standard library plus `transformers` for the tokenizer. Method and options: [`tools/README.md`](tools/README.md#compare_puzzlespy). |
 
 ## Conventions
 
@@ -36,7 +37,7 @@ experiments/<slug>/
 
 **Configs.** Either NVIDIA's recipe verbatim (its licence header kept) plus small overlay blocks and command-line overrides, or overrides only, when the recipe ships inside the container image. The README says which.
 
-**Environments.** Each experiment pins its own container tags or requirements. There is no repository-wide environment, because the stacks differ: the AutoModel 26.08 image ships transformers 5.12.1, vLLM is at v0.27.1, NeMo-RL at v0.7.0, and the autoresearch repositories pin transformers 4.51.3.
+**Environments.** Each experiment pins its own container tags or requirements (the reasoning-puzzles experiment keeps a `requirements.txt` and a `.venv/` in its folder for the laptop-side data steps). There is no repository-wide environment, because the stacks differ: the AutoModel 26.08 image ships transformers 5.12.1, vLLM is at v0.27.1, NeMo-RL at v0.7.0, and the autoresearch repositories pin transformers 4.51.3.
 
 **On the machine.** New experiments keep their files under `/shared/<slug>/{configs,checkpoints,logs,data}` so that two experiments never share a checkpoint folder (reusing one resumes the old run). The Lightning guide keeps the flat `/shared/{configs,checkpoints,logs}` layout it was measured with.
 
@@ -52,7 +53,7 @@ Fill in the README (its comments say what each section is for), add a row to the
 
 ## Related repositories
 
-- [autoresearch-sft](https://github.com/priyanlc/autoresearch-sft) and [autoresearch-sft-grpo](https://github.com/priyanlc/autoresearch-sft-grpo): an autonomous SFT (and SFT + GRPO) optimisation loop for the Kaggle Nemotron reasoning challenge. They stay separate because the loop depends on their own git history; the planned reasoning-puzzles experiment here will reuse their data preparation and scorer.
+- [autoresearch-sft](https://github.com/priyanlc/autoresearch-sft) and [autoresearch-sft-grpo](https://github.com/priyanlc/autoresearch-sft-grpo): an autonomous SFT (and SFT + GRPO) optimisation loop for the Kaggle Nemotron reasoning challenge. They stay separate because the loop depends on their own git history; the reasoning-puzzles experiment here is self-contained and does not depend on them.
 
 ## Licences
 
