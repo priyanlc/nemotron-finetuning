@@ -243,13 +243,19 @@ EOF
 
 Pass: `60 rows OK`, a supervised count well below the sequence length, a loss span from (or just after) `<|im_start|>assistant` to `<|im_end|>`. An assertion failure: do not train ([if-it-fails.md](if-it-fails.md) has the fallback).
 
-Then run NVIDIA's unchanged 20-step schedule with validation at step 10, inside `tmux` so a dropped connection does not kill it (`Ctrl-b`, `d` detaches; `tmux attach -t train` returns):
+Start `tmux` first, so a dropped connection does not kill the run (`Ctrl-b`, `d` detaches; `tmux attach -t train` returns):
 
 ```bash
 apt-get update && apt-get install -y tmux && tmux new -s train     # or tmux attach -t train
+```
+
+Then, **inside the tmux session**, run NVIDIA's unchanged 20-step schedule with validation at step 10. Set `E` and `RUN` in this same shell, since `tmux` opened a fresh one:
+
+```bash
 E=/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark
 cd /opt/Automodel
 RUN=puzzles-test
+echo "E=$E RUN=$RUN"                            # both must be non-empty before you train
 test -e $E/checkpoints/$RUN && echo "exists, pick another name" || \
 CUDA_VISIBLE_DEVICES=0 automodel $E/configs/puzzles_lora.yaml \
   --nproc-per-node 1 \
@@ -280,6 +286,7 @@ Pass before step 9: `mem` around 62 GiB (stop above 90); `loss` falling; `grad_n
 E=/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark
 cd /opt/Automodel
 RUN=puzzles-200-$(date +%m%d-%H%M)
+echo "E=$E RUN=$RUN"                            # both must be non-empty before you train
 test -e $E/checkpoints/$RUN && echo "exists, pick another name" || \
 CUDA_VISIBLE_DEVICES=0 automodel $E/configs/puzzles_lora.yaml \
   --nproc-per-node 1 \
