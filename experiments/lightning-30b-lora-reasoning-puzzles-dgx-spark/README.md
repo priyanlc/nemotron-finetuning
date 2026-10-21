@@ -158,7 +158,7 @@ test.jsonl: 600 rows render as prefix + completion; prompt tokens max 382, mean 
 check OK
 ```
 
-A `FAILED:` line: stop; the training text differs from what the model is served.
+A `FAILED:` line: stop; the training text differs from what the model is served. A `PermissionError` or a refused download: [if-it-fails.md](if-it-fails.md).
 
 ## Train: in the AutoModel container
 
@@ -246,7 +246,7 @@ Pass: `60 rows OK`, a supervised count well below the sequence length, a loss sp
 Then run NVIDIA's unchanged 20-step schedule with validation at step 10, inside `tmux` so a dropped connection does not kill it (`Ctrl-b`, `d` detaches; `tmux attach -t train` returns):
 
 ```bash
-apt-get install -y tmux 2>/dev/null; tmux new -s train     # or tmux attach -t train
+apt-get update && apt-get install -y tmux && tmux new -s train     # or tmux attach -t train
 E=/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark
 cd /opt/Automodel
 RUN=puzzles-test
