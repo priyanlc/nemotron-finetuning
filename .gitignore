@@ -8,6 +8,7 @@ __pycache__/
 
 # Training outputs and model weights: adapters and checkpoints never go in git
 checkpoints/
+logs/
 adapter*/
 *.safetensors
 *.distcp

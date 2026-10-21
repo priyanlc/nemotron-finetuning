@@ -61,10 +61,10 @@ def write(name, width, height, body, title):
 
 
 def data_pipeline():
-    """01: train.csv -> classify -> split -> build -> three files -> check -> Spark."""
+    """01: train.csv -> classify -> split -> build -> three files -> check -> read in place by the containers."""
     W, H = 1920, 1000
     b = [text(48, 66, "How train.csv becomes three JSONL files", 40, 700),
-         text(48, 108, "data/make_puzzle_jsonl.py on the laptop, in the experiment's virtual environment (steps 2 to 4); the copy to the Spark is step 5", 24, 400, QUIET)]
+         text(48, 108, "data/make_puzzle_jsonl.py on the Spark host, in the experiment's virtual environment (README steps 3 to 5); both containers then read the files where they are", 24, 400, QUIET)]
     ya, ha = 160, 340
     boxes = [(48, 260), (360, 380), (792, 470), (1314, 558)]   # x, w; the 52 px gaps hold the arrows
     x, w = boxes[0]
@@ -107,9 +107,9 @@ def data_pipeline():
           text(68, yc + 96, "renders all 9,500 rows with the Lightning chat template, the way AutoModel will, and confirms that each", 23),
           text(68, yc + 130, "training sequence is the served prompt followed by the completion, byte for byte", 23),
           text(68, yc + 168, "longest sequence 492 tokens, mean 240: seq_length 2048 is a cap nothing reaches", 22, 400, QUIET),
-          box(1240, yc, 632, hc, ORANGE_F, ORANGE_S), text(1260, yc + 46, "5 · copy to the Spark with scp", 28, 700),
-          mono(1260, yc + 96, "~/nemo-shared/lightning-30b-lora-", 20), mono(1260, yc + 124, "reasoning-puzzles-dgx-spark/data/", 20),
-          text(1260, yc + 168, "= /shared/…/data/ inside both containers", 22, 400, QUIET)]
+          box(1240, yc, 632, hc, ORANGE_F, ORANGE_S), text(1260, yc + 46, "5 · read in place by both containers", 28, 700),
+          mono(1260, yc + 96, "~/nemo-shared/nemotron-finetuning/experiments/", 18), mono(1260, yc + 124, "lightning-30b-lora-reasoning-puzzles-dgx-spark/data/", 18),
+          text(1260, yc + 168, "= /shared/nemotron-finetuning/… in both containers", 22, 400, QUIET)]
     b += [line(centers[0], yb + hb, centers[0], 735), line(centers[1], yb + hb, centers[1], 735), line(centers[2], yb + hb, centers[2], 735),
           line(centers[0], 735, 1556, 735), arrow(618, 735, 618, yc - 4), arrow(1556, 735, 1556, yc - 4)]
     write("01-data-pipeline.svg", W, H, b, "How train.csv becomes three JSONL files")
@@ -167,10 +167,11 @@ def training_sequence():
           text(rx, mid + 40, "prompt and thinking on, through", 22), text(rx, mid + 70, "/v1/completions, temperature 0,", 22),
           text(rx, mid + 100, "up to 7,680 new tokens", 22)]
     b += [text(rx, y4 + 44, "the trained span", 28, 700, GREEN_T),
-          text(rx, y4 + 84, "the completion's tail plus <|im_end|>:", 22), text(rx, y4 + 114, "answer_only_loss_mask puts the loss on", 22),
-          text(rx, y4 + 144, "these tokens and nowhere else", 22)]
+          text(rx, y4 + 84, "the completion's tail plus <|im_end|>:", 22), text(rx, y4 + 114, "the model is scored only on predicting", 22),
+          text(rx, y4 + 144, "these tokens, so they are the only", 22), text(rx, y4 + 174, "ones it learns from; the prompt is", 22),
+          text(rx, y4 + 204, "read as context but never scored", 22)]
     yn = y4 + 200 + 50
-    b += [text(48, yn, "Training text = served prompt + completion tail + <|im_end|>. Step 4 checks it on all 9,500 rows; step 8 repeats the check inside the container,", 23),
+    b += [text(48, yn, "Training text = served prompt + completion tail + <|im_end|>. Step 5 checks it on all 9,500 rows; step 8 repeats the check inside the container,", 23),
           text(48, yn + 34, "against AutoModel's dataset class and its loss mask. With the dataset's default, use_hf_chat_template: false, a space would follow the prompt instead.", 23)]
     write("02-training-sequence.svg", W, H, b, "One puzzle, one training sequence, one served prompt")
 

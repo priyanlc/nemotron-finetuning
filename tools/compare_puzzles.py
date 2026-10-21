@@ -8,7 +8,8 @@ the Kaggle scorer does. It reports accuracy per category, answers fixed and brok
 95% interval for the accuracy gain.
 
 Run inside the nemo-automodel container, which has transformers, the cached tokenizer and the host network:
-  docker exec -it lightning-lora python3 /shared/compare_puzzles.py --data /shared/<exp>/data/test.jsonl --n 12
+  docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --n 12   # defaults: this
+  experiment's data/test.jsonl and logs/ under /shared/nemotron-finetuning/experiments/
 Options: --url, --base-name, --adapter-name, --n rows to score (0 = all), --max-tokens (7680), --concurrency (16),
 --out (CSV per row; a .json summary is written next to it), --selftest (checks the statistics, needs no server).
 """
@@ -32,11 +33,11 @@ def parse_args():
     ap.add_argument("--url", default="http://localhost:8000/v1")
     ap.add_argument("--base-name", default="lightning-base")
     ap.add_argument("--adapter-name", default="lightning-puzzles")
-    ap.add_argument("--data", default="/shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/test.jsonl")
+    ap.add_argument("--data", default="/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/test.jsonl")
     ap.add_argument("--n", type=int, default=0, help="rows to score, 0 = all")
     ap.add_argument("--max-tokens", type=int, default=7680)
     ap.add_argument("--concurrency", type=int, default=16)
-    ap.add_argument("--out", default="/shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare_puzzles.csv")
+    ap.add_argument("--out", default="/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare_puzzles.csv")
     ap.add_argument("--selftest", action="store_true")
     return ap.parse_args()
 

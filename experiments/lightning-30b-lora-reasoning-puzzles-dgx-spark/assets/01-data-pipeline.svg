@@ -2,7 +2,7 @@
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#333333"/></marker></defs>
 <rect width="1920" height="1000" fill="#ffffff"/>
 <text x="48" y="66" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#1f1f1f" text-anchor="start">How train.csv becomes three JSONL files</text>
-<text x="48" y="108" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">data/make_puzzle_jsonl.py on the laptop, in the experiment's virtual environment (steps 2 to 4); the copy to the Spark is step 5</text>
+<text x="48" y="108" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#5a5a5a" text-anchor="start">data/make_puzzle_jsonl.py on the Spark host, in the experiment's virtual environment (README steps 3 to 5); both containers then read the files where they are</text>
 <rect x="48" y="160" width="260" height="340" rx="14" fill="#dce8f8" stroke="#2f4f7f" stroke-width="2.5"/>
 <text x="68" y="208" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="30" font-weight="700" fill="#1f1f1f" text-anchor="start">train.csv</text>
 <text x="68" y="260" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#1f1f1f" text-anchor="start">9,500 puzzles</text>
@@ -72,10 +72,10 @@
 <text x="68" y="890" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="23" font-weight="400" fill="#1f1f1f" text-anchor="start">training sequence is the served prompt followed by the completion, byte for byte</text>
 <text x="68" y="928" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">longest sequence 492 tokens, mean 240: seq_length 2048 is a cap nothing reaches</text>
 <rect x="1240" y="760" width="632" height="190" rx="14" fill="#fdebd3" stroke="#9a6b2a" stroke-width="2.5"/>
-<text x="1260" y="806" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1f1f" text-anchor="start">5 · copy to the Spark with scp</text>
-<text x="1260" y="856" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="20" font-weight="400" fill="#1f1f1f" text-anchor="start">~/nemo-shared/lightning-30b-lora-</text>
-<text x="1260" y="884" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="20" font-weight="400" fill="#1f1f1f" text-anchor="start">reasoning-puzzles-dgx-spark/data/</text>
-<text x="1260" y="928" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">= /shared/…/data/ inside both containers</text>
+<text x="1260" y="806" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1f1f" text-anchor="start">5 · read in place by both containers</text>
+<text x="1260" y="856" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="18" font-weight="400" fill="#1f1f1f" text-anchor="start">~/nemo-shared/nemotron-finetuning/experiments/</text>
+<text x="1260" y="884" font-family="Menlo, Monaco, 'Courier New', monospace" font-size="18" font-weight="400" fill="#1f1f1f" text-anchor="start">lightning-30b-lora-reasoning-puzzles-dgx-spark/data/</text>
+<text x="1260" y="928" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" font-weight="400" fill="#5a5a5a" text-anchor="start">= /shared/nemotron-finetuning/… in both containers</text>
 <line x1="328.0" y1="710" x2="328.0" y2="735" stroke="#333333" stroke-width="2.5"/>
 <line x1="940.0" y1="710" x2="940.0" y2="735" stroke="#333333" stroke-width="2.5"/>
 <line x1="1572.0" y1="710" x2="1572.0" y2="735" stroke="#333333" stroke-width="2.5"/>

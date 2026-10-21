@@ -1,7 +1,9 @@
-# Steps 1 to 4 of README.md (building and checking the puzzle data) run in a virtual environment made from this
-# file: uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-# Tested on an Apple-silicon Mac with Python 3.12 on 18 October 2026. No torch: only the tokenizer and its chat
-# template are used. The Spark steps use the containers named in README.md, not this file.
+# Steps 2 to 5 of README.md (building and checking the puzzle data on the Spark host, outside the containers) run in
+# a virtual environment made from this file: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# The pins were tested on an Apple-silicon Mac with Python 3.12 on 18 October 2026; they and their dependencies resolve
+# as Linux aarch64 wheels for the Spark (uv pip compile --only-binary :all: --python-platform aarch64-manylinux_2_28,
+# 19 October 2026). No torch: only the tokenizer and its chat template are used. The container steps use the images
+# named in README.md, not this file.
 polars==2.0.0          # data/make_puzzle_jsonl.py: reads train.csv and draws the seeded splits
 transformers==5.20.1   # --check: the Lightning tokenizer and chat template
 jinja2==3.1.6          # renders the chat template

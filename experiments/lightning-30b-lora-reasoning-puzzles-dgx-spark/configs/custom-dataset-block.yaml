@@ -6,7 +6,7 @@
 
 dataset:
   _target_: nemo_automodel.components.datasets.llm.column_mapped_text_instruction_dataset.ColumnMappedTextInstructionDataset
-  path_or_dataset_id: /shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/train.jsonl
+  path_or_dataset_id: /shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/train.jsonl
   split: train
   column_mapping:
     question: prompt
@@ -19,7 +19,7 @@ dataset:
 
 validation_dataset:
   _target_: nemo_automodel.components.datasets.llm.column_mapped_text_instruction_dataset.ColumnMappedTextInstructionDataset
-  path_or_dataset_id: /shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/val.jsonl
+  path_or_dataset_id: /shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/val.jsonl
   split: train
   column_mapping:
     question: prompt

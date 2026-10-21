@@ -59,10 +59,9 @@ Two things to know before comparing numbers with anything else. The space in `ct
 `compare_puzzles.py` compares a base model and a LoRA adapter served by one vLLM server on the Kaggle reasoning puzzles, by generation. For each row of a JSONL file (`{"id", "category", "prompt", "answer"}`, as `experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/make_puzzle_jsonl.py` writes `test.jsonl`) it renders the prompt with the model's chat template, asks `/v1/completions` for a greedy continuation from both model names, extracts the last `\boxed{}` and compares it with the expected answer the way the Kaggle metric does. It reports accuracy per category, the answers the adapter fixed and broke, an exact McNemar test and a paired 95% interval for the gain. It needs the standard library plus `transformers` for the tokenizer, both in NVIDIA's AutoModel container. The [reasoning-puzzles guide](../experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/README.md#step-11-time-the-scorer-on-12-puzzles) shows it in use.
 
 ```bash
-cp ~/nemo-shared/nemotron-finetuning/tools/compare_puzzles.py ~/nemo-shared/
-docker exec -it lightning-lora python3 /shared/compare_puzzles.py --selftest     # checks the statistics; no server needed
-docker exec -it lightning-lora python3 /shared/compare_puzzles.py --n 12 --out /shared/<experiment>/logs/compare-12.csv
-docker exec -it lightning-lora python3 /shared/compare_puzzles.py --n 0 --out /shared/<experiment>/logs/compare-600.csv   # all rows; hours
+docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --selftest     # checks the statistics; no server needed
+docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --n 12 --out /shared/<experiment>/logs/compare-12.csv
+docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --n 0 --out /shared/<experiment>/logs/compare-600.csv   # all rows; hours
 ```
 
 ### How the scoring works
@@ -92,10 +91,10 @@ def answers_match(pred, gold):
 |---|---|---|
 | `--url` | `http://localhost:8000/v1` | The vLLM server. |
 | `--base-name`, `--adapter-name` | `lightning-base`, `lightning-puzzles` | The two served model names; they must match the server's `--served-model-name` and `--lora-modules`. |
-| `--data` | `/shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/test.jsonl` | The puzzles to score. |
+| `--data` | `/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/test.jsonl` | The puzzles to score. |
 | `--n` | `0` | Rows to score, spread over the file; `0` scores all of them. |
 | `--max-tokens` | `7680` | The generation budget, capped per request at 8,192 minus the prompt's tokens. |
 | `--concurrency` | `16` | Requests in flight at once; vLLM batches them. |
-| `--out` | `/shared/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare_puzzles.csv` | The per-row CSV (prediction, correctness, token count and finish reason for both models). A `.json` summary and a `-generations.jsonl` file with every generation are written beside it. |
+| `--out` | `/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare_puzzles.csv` | The per-row CSV (prediction, correctness, token count and finish reason for both models). A `.json` summary and a `-generations.jsonl` file with every generation are written beside it. |
 | `--selftest` | | Checks the statistics and the answer functions without a server. |
 
