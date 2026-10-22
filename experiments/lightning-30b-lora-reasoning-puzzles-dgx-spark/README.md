@@ -2,7 +2,7 @@
 
 *Part of [nemotron-finetuning](../../README.md).*
 
-**LoRA-tune Nemotron 3.5 Lightning on the Kaggle reasoning puzzles on one DGX Spark with NVIDIA's single-GPU recipe, then score adapter against base on 600 held-out puzzles.** The Spark, containers and recipe are those of the [HellaSwag experiment](../lightning-30b-lora-hellaswag-dgx-spark/README.md), whose guide explains that shared setup and its failures; the steps below stand on their own.
+**LoRA-tune Nemotron 3.5 Lightning on the Kaggle reasoning puzzles on one DGX Spark with NVIDIA's single-GPU recipe, then score the adapter against the base on held-out puzzles.** The Spark, containers and recipe are those of the [HellaSwag experiment](../lightning-30b-lora-hellaswag-dgx-spark/README.md), whose guide explains that shared setup and its failures; the steps below stand on their own.
 
 > **Setup:** one DGX Spark (GB10, 128 GB) · `nvcr.io/nvidia/nemo-automodel:26.08` to train, `vllm/vllm-openai:v0.27.1` to serve · `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16` · NVIDIA's single-GPU LoRA recipe, dataset swapped · a Python 3 venv on the Spark host for the data steps, no GPU.
 
@@ -25,7 +25,7 @@ All steps run on the Spark, in order.
 | 9 | [Train 200 steps with validation](#step-9-train-200-steps-with-validation) | `lightning-lora` | 45 to 90 minutes (estimate) |
 | 10 | [Free the GPU and serve base and adapter](#step-10-free-the-gpu-and-serve-base-and-adapter) | Second Spark terminal, then `vllm-lightning` | About 10 minutes |
 | 11 | [Time the scorer on 12 puzzles](#step-11-time-the-scorer-on-12-puzzles) | Spark host, executing inside `lightning-lora` | Minutes |
-| 12 | [Run the full 600-puzzle comparison](#step-12-run-the-full-600-puzzle-comparison) | Spark host, executing inside `lightning-lora` | 2 to 5 hours (estimate) |
+| 12 | [Run the 300-puzzle comparison](#step-12-run-the-300-puzzle-comparison) | Spark host, executing inside `lightning-lora` | About 3.5 hours (measured) |
 | 13 | [Inspect the generations and write up](#step-13-inspect-the-generations-and-write-up) | Spark host | 3 to 4 hours |
 
 **After the walkthrough:** [Results](#results) · [If it fails](if-it-fails.md) · [Files](#files-in-this-experiment) · [Licences](#third-party-material-and-licences) · [References](#references)
@@ -60,11 +60,11 @@ AutoModel turns each `prompt` and `completion` pair into one token sequence with
 
 The sequence has two parts. The first is the served prompt: the system turn, the user turn with the puzzle, and the start of the assistant turn, `<|im_start|>assistant` and an open `<think>`. The scorer sends exactly this text at evaluation, so training starts from what the model will see in use. The second part is the completion: the rest of the trace, `</think>`, the boxed answer and the closing `<|im_end|>`.
 
-The loss is where learning happens. At every position the model guesses the next token, and the training loss, a cross-entropy, measures how wrong that guess was. With `answer_only_loss_mask: true`, only the completion's tokens are scored. The prompt's tokens are read as context but never scored, so the adapter learns to continue a puzzle with a trace and a boxed answer, not to reproduce the puzzle. Training lowers this loss.
+The loss is where learning happens. At every position the model guesses the next token, and the training loss, a cross-entropy, measures how wrong that guess was. With `answer_only_loss_mask: true`, the scored tokens are the whole assistant turn: the fixed `<|im_start|>assistant` header and open `<think>`, then the trace, `</think>`, the boxed answer and the closing `<|im_end|>` with its newline. The system and user turns are read as context but never scored, so the adapter learns to continue a puzzle with a trace and a boxed answer, not to reproduce the puzzle. One subtlety: the scored span starts a few tokens *before* the inference boundary. The assistant header is the tail of the served prompt, yet it sits inside the loss mask, because AutoModel masks by turn, not by where generation begins; those header tokens are identical in every row, so scoring them changes nothing in practice. Training lowers this loss.
 
 ![One puzzle, one training sequence, one served prompt](assets/02-training-sequence.png)
 
-*The Data section's example, rendered. Blue: the served prompt, sent unchanged by the scorer; the model reads it but is never scored on it. Green: the completion; the model is scored only on predicting these tokens, so they are the only ones it learns from.*
+*The Data section's example, rendered. Blue bracket: the served prompt, what the scorer sends unchanged. Green: the whole assistant turn — the `<|im_start|>assistant` header, the trace, the boxed answer and `<|im_end|>` — the only tokens the model is scored on. The two overlap at the assistant header: it ends the served prompt yet is still inside the loss mask.*
 
 Step 5 checks that all 9,500 rows render this way; step 8 repeats the check inside the container.
 
@@ -140,14 +140,13 @@ cipher vocabulary hint: 77 words
 
 ### Step 5: Check the training text against the inference prefix
 
-**Run on the Spark host, in the venv.** The check needs the Lightning tokenizer: accept the model's terms on Hugging Face and log in once; the download is a few MB into `~/.cache/huggingface`.
+**Run on the Spark host, in the venv.** The check needs only the Lightning tokenizer. The model repo is public and ungated, so no Hugging Face login is required; the first run downloads about 17 MB of tokenizer files into `~/.cache/huggingface`.
 
 ```bash
-hf auth login                              # once; token from huggingface.co/settings/tokens
 python data/make_puzzle_jsonl.py --check
 ```
 
-If the containers' cache already holds the model, skip the login and read it in place: `HF_HOME=~/nemo-shared/.cache/huggingface HF_HUB_OFFLINE=1 python data/make_puzzle_jsonl.py --check` (the cache belongs to root, but reading it is fine).
+If the containers' cache already holds the tokenizer, read it in place offline instead of downloading: `HF_HOME=~/nemo-shared/.cache/huggingface HF_HUB_OFFLINE=1 python data/make_puzzle_jsonl.py --check` (the cache belongs to root, but reading it is fine).
 
 `--check` rebuilds the files, renders every row as AutoModel will (three turns through the chat template) and as the scorer will (user turn plus generation prompt), and requires the first to equal the second plus the completion and `<|im_end|>`. Expected, after the four lines of step 4 print again, in about ten seconds:
 
@@ -180,7 +179,7 @@ docker run -it \
 
 Key options: `-v ~/nemo-shared:/shared` is the mount in the tree above and `HF_HOME` keeps the model cache inside it; `--shm-size=32g` gives data loading shared memory; `OMP_NUM_THREADS=8` sets the CPU threads used when loading experts.
 
-**Inside `lightning-lora`**, download the model once (accept its OpenMDW-1.1 terms first; the container's cache is `/shared/.cache/huggingface`, so the host login from step 5 does not carry over):
+**Inside `lightning-lora`**, download the model once (accept its OpenMDW-1.1 terms first; the container's cache is `/shared/.cache/huggingface`, separate from the host cache step 5 used):
 
 ```bash
 hf auth login                 # token from huggingface.co/settings/tokens
@@ -362,18 +361,18 @@ rows = [json.loads(l) for l in open('$E/logs/compare-12-generations.jsonl')]
 for r in rows[:2]: print('==', r['model'], r['finish'], r['tokens'], 'tokens, pred', r['pred']); print(r['text'][:1200])"
 ```
 
-Multiply the 12-puzzle time by 50; expect hours, since base traces run to thousands of tokens. If that does not fit your time, use `--n 300` (50 per category) and say so in the write-up.
+Multiply the 12-puzzle time by 50; expect hours, since base traces run to thousands of tokens. The full 600 at `--concurrency 16` is roughly 14 hours; this experiment scored a balanced `--n 300 --concurrency 32` subset (50 per category) in about 3 h 20 m (step 12).
 
-### Step 12: Run the full 600-puzzle comparison
+### Step 12: Run the 300-puzzle comparison
 
-**Run on the Spark host, in the second terminal:**
+**Run on the Spark host, in the second terminal.** This experiment scored a balanced 300-puzzle subset (50 per category) at `--concurrency 32`:
 
 ```bash
-docker exec -it lightning-lora bash -c "python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --n 0 --concurrency 16 \
-  --out $E/logs/compare-600.csv 2>&1 | tee $E/logs/compare-600.log"
+docker exec -it lightning-lora bash -c "python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --n 300 --concurrency 32 \
+  --out $E/logs/compare-300.csv 2>&1 | tee $E/logs/compare-300.log"
 ```
 
-It prints step 11's report plus the truncation counts; `logs/` gets the per-row CSV, a `.json` summary and `-generations.jsonl`. Both models get the same prompts, so this is adapter versus base under one procedure; a result near p = 0.05 deserves a second run, since vLLM's batching can flip a few greedy answers. When done, `Ctrl-C` in the vLLM terminal stops the server.
+It prints step 11's report plus the truncation counts; `logs/` gets the per-row CSV, a `.json` summary and `-generations.jsonl`. Both models get the same prompts, so this is adapter versus base under one procedure; a result near p = 0.05 deserves a second run, since vLLM's batching can flip a few greedy answers. For all 600, pass `--n 0 --concurrency 16` (about 14 hours) and change the output names to match. When done, `Ctrl-C` in the vLLM terminal stops the server.
 
 ### Step 13: Inspect the generations and write up
 
@@ -383,7 +382,7 @@ It prints step 11's report plus the truncation counts; `logs/` gets the per-row 
 E=/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark
 docker exec -it lightning-lora python3 -c "
 import json, statistics as st
-rows = [json.loads(l) for l in open('$E/logs/compare-600-generations.jsonl')]
+rows = [json.loads(l) for l in open('$E/logs/compare-300-generations.jsonl')]
 for m in sorted({r['model'] for r in rows}):
     rs = [r for r in rows if r['model'] == m]; toks = sorted(r['tokens'] or 0 for r in rs)
     print(m, '| boxed answer', round(sum(r['pred'] is not None for r in rs) / len(rs), 3), '| hit the limit', sum(r['finish'] == 'length' for r in rs),
@@ -391,16 +390,30 @@ for m in sorted({r['model'] for r in rows}):
 docker exec -it lightning-lora python3 -c "
 import csv, collections
 c = collections.Counter()
-for r in csv.DictReader(open('$E/logs/compare-600.csv')): c[(r['category'], r['base_ok'], r['adapter_ok'])] += 1
+for r in csv.DictReader(open('$E/logs/compare-300.csv')): c[(r['category'], r['base_ok'], r['adapter_ok'])] += 1
 for cat in sorted({k[0] for k in c}):
     print(f'{cat:10} fixed {c[(cat, \"0\", \"1\")]:3}  broke {c[(cat, \"1\", \"0\")]:3}  both right {c[(cat, \"1\", \"1\")]:3}  both wrong {c[(cat, \"0\", \"0\")]:3}')"
 ```
 
-Read a few adapter generations per category beside the base's, asking three things: does the think block repeat the training template verbatim, is the box always present, and does the base run out of tokens? Then update this folder as the [template](../_template/README.md) asks: README status and results, `configs/puzzles_lora.yaml` as run, `results/validation-loss.csv` from `checkpoints/puzzles-200/validation.jsonl`, `results/puzzles-600.csv` from the per-row CSV, and `results/README.md`.
+Read a few adapter generations per category beside the base's, asking three things: does the think block repeat the training template verbatim, is the box always present, and does the base run out of tokens? Then update this folder as the [template](../_template/README.md) asks: README status and results, `configs/puzzles_lora.yaml` as run, `results/validation-loss.csv` from `checkpoints/puzzles-200/validation.jsonl`, `results/puzzles-300.csv` from the per-row CSV, and `results/README.md`.
 
 ## Results
 
-The run's files go under `results/`.
+Trained 200 steps on one GB10 (about 62 GiB, validation loss 0.530 at step 19 to 0.091 at step 199; `LOWEST_VAL` = step 199). Scored a balanced **300 of the 600** test puzzles (50 per category), `--concurrency 32`, about 3 h 20 m. Per-row files are in `logs/`: `compare-300.csv`, `compare-300.json`, `compare-300-generations.jsonl`.
+
+**Overall:** base 0.290 to adapter 0.550, a +0.260 gain (95% CI +0.197 to +0.323), exact McNemar p < 0.001; the adapter fixed 96 answers and broke 18.
+
+| category | base | adapter |
+|---|---|---|
+| unit_conv | 0.06 | 1.00 |
+| gravity | 0.22 | 0.92 |
+| numeral | 0.98 | 1.00 |
+| bit_ops | 0.02 | 0.24 |
+| symbol | 0.10 | 0.10 |
+| cipher | 0.36 | 0.04 |
+| **all 300** | **0.29** | **0.55** |
+
+Read honestly: the base model hit the 7,680-token cap on 218 of 300 puzzles and never boxed an answer there; the adapter truncated 0 of 300. Most of the gain is length discipline, the adapter finishing and always boxing, which is what carries unit conversion and gravity from near-zero to near-perfect. The counterweight is cipher, where the adapter regressed (0.36 to 0.04): its concise, answer-aware training traces make it box a fluent but wrong guess on the one category that rewards patient decryption. Symbols stay flat, matching their thin trace coverage. The full 600-puzzle run was not needed; this result is already decisive (p well below 0.001).
 
 ## Files in this experiment
 

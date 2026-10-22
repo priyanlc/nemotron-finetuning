@@ -7,9 +7,9 @@
 | `python3 -m venv` fails on `ensurepip` | `python3-venv` not installed | `sudo apt-get install -y python3-venv`; repeat step 2. |
 | `ModuleNotFoundError` for `polars` or `transformers` | venv not active | `source .venv/bin/activate` in the experiment folder. |
 | `403 Forbidden` from the Kaggle CLI | Rules not accepted, or not logged in | Accept the rules, `kaggle auth login --no-launch-browser`, or `scp` a browser download into `data/`. |
-| `401` or `GatedRepoError` in step 5 | Tokenizer download refused | Accept the model's terms on Hugging Face, then `hf auth login`. |
-| `PermissionError` under `~/nemo-shared/.cache` in step 5 | The root-owned container cache was written to | Drop `HF_HOME` and `HF_HUB_OFFLINE`; log in and download into `~/.cache/huggingface`. |
-| `PermissionError` under `~/.cache/huggingface` in step 5 | The host cache belongs to root, created by a container that mounted it or by `sudo`; neither the token nor the download can be written | `sudo chown -R "$USER:$USER" ~/.cache/huggingface`; `hf auth login`; rerun the check. |
+| `401`/`GatedRepoError` in step 5 | Rare: the repo is public and ungated, so this points to a proxy or an HF outage | Retry; if it persists, `hf auth login` with a token from huggingface.co/settings/tokens and retry. |
+| `PermissionError` under `~/nemo-shared/.cache` in step 5 | The root-owned container cache was written to | Drop `HF_HOME` and `HF_HUB_OFFLINE` so the download goes to `~/.cache/huggingface`. |
+| `PermissionError` under `~/.cache/huggingface` in step 5 | The host cache belongs to root, created by a container that mounted it or by `sudo`, so the download cannot be written | `sudo chown -R "$USER:$USER" ~/.cache/huggingface`; rerun the check. |
 | `FAILED: …` in step 5 | Wrong tokenizer or chat template | Check `--model` and that the cached template is Lightning's. |
 | Step 8 decode check fails (space after `<think>`, no `<\|im_end\|>`, prompt tokens in the loss) | The chat-template path does not match the native render on this container | Do not train. Use NVIDIA's `make_agent_chat_dataset` (DGX Station Lightning LoRA recipe): rows `{"messages": [user, assistant]}`, trace in `reasoning_content`, `\boxed{}` in `content`, `mask_reasoning_content: false`, `seq_length: 2048`; rerun the check. |
 | `num_label_tokens` of 0 in the log | A row with an empty loss mask was skipped | Fix the mask before training. |

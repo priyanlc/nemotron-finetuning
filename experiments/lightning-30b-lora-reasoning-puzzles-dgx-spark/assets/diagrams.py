@@ -149,27 +149,27 @@ def training_sequence():
           note(y2 + 38 + 30 * 9, "the boxed-answer instruction the script adds"),
           note(y2 + 38 + 30 * 10, "(a cipher prompt also gets the vocabulary hint, just before it)")]
     y3 = y2 + 380 + 12
-    b += band(y3, 90, "#eef3fb", BLUE_S, [("<|im_start|>assistant", "tok"), ("<think>", "key")], "assistant turn")
-    b += [note(y3 + 52, "the served prompt ends here, with an open <think>")]
+    b += band(y3, 90, GREEN_F, GREEN_S, [("<|im_start|>assistant", "tok"), ("<think>", "key")], "assistant turn")
+    b += [note(y3 + 52, "the served prompt ends here (open <think>) — and the scored span starts here")]
     y4 = y3 + 90 + 12
     b += band(y4, 200, GREEN_F, GREEN_S, [("Using d = 0.5*g*t^2: g = 2d/t^2 = 2*9.47/1.69^2 = 6.6314.", "text"),
                                           ("Apply to find d for the new t. Answer: 26.18", "text"),
                                           ("</think>", "key"), ("\\boxed{26.18}", "key"), ("<|im_end|>", "tok")], "")
     b += [note(y4 + 38 + 30 * 3, "the completion from train.jsonl, after its opening <think>")]
 
-    def bracket(ya, yb, color):
-        return [path(f"M{rx - 40} {ya} h 14 v {yb - ya} h -14", color, 3)]
+    def bracket(ya, yb, color, xoff=40):
+        return [path(f"M{rx - xoff} {ya} h 14 v {yb - ya} h -14", color, 3)]
 
-    b += bracket(y1, y3 + 90, BLUE_S) + bracket(y4, y4 + 200, GREEN_S)
+    b += bracket(y1, y3 + 90, BLUE_S, 70) + bracket(y3, y4 + 200, GREEN_S, 40)
     mid = (y1 + y3 + 90) / 2
     b += [text(rx, mid - 60, "the served prompt", 28, 700, BLUE_S),
           text(rx, mid - 20, "what the scorer sends: the user", 22), text(rx, mid + 10, "message rendered with the generation", 22),
           text(rx, mid + 40, "prompt and thinking on, through", 22), text(rx, mid + 70, "/v1/completions, temperature 0,", 22),
           text(rx, mid + 100, "up to 7,680 new tokens", 22)]
     b += [text(rx, y4 + 44, "the trained span", 28, 700, GREEN_T),
-          text(rx, y4 + 84, "the completion's tail plus <|im_end|>:", 22), text(rx, y4 + 114, "the model is scored only on predicting", 22),
-          text(rx, y4 + 144, "these tokens, so they are the only", 22), text(rx, y4 + 174, "ones it learns from; the prompt is", 22),
-          text(rx, y4 + 204, "read as context but never scored", 22)]
+          text(rx, y4 + 84, "the whole assistant turn: the", 22), text(rx, y4 + 114, "<|im_start|>assistant header, the trace,", 22),
+          text(rx, y4 + 144, "the boxed answer and <|im_end|>. These", 22), text(rx, y4 + 174, "are the only tokens the model is scored", 22),
+          text(rx, y4 + 204, "on; the system and user turns are not", 22)]
     yn = y4 + 200 + 50
     b += [text(48, yn, "Training text = served prompt + completion tail + <|im_end|>. Step 5 checks it on all 9,500 rows; step 8 repeats the check inside the container,", 23),
           text(48, yn + 34, "against AutoModel's dataset class and its loss mask. With the dataset's default, use_hf_chat_template: false, a space would follow the prompt instead.", 23)]
