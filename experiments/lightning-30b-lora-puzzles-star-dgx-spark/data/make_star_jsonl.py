@@ -156,6 +156,10 @@ def cmd_build(a):
     too_long = [r for r in kept if lengths[r["id"]] > a.seq_length]
     reasons[f"over_{a.seq_length}_tokens"] = len(too_long)
     kept = [r for r in kept if lengths[r["id"]] <= a.seq_length]
+    print(f"read {len(gens)} generations from {a.samples}")
+    for why, n in sorted(reasons.items(), key=lambda kv: -kv[1]):
+        print(f"  {why:32s} {n:5d}   dropped")
+    print(f"  {'kept':32s} {len(kept):5d}")
     if len(kept) <= a.val_holdout:
         raise SystemExit(f"FAILED: only {len(kept)} usable traces; nothing left after holding out {a.val_holdout}")
 
@@ -190,10 +194,6 @@ def cmd_build(a):
     with open(RESULTS / "star-dataset.json", "w") as f:
         json.dump(summary, f, indent=2)
 
-    print(f"read {len(gens)} generations from {a.samples}")
-    for why, n in sorted(reasons.items(), key=lambda kv: -kv[1]):
-        print(f"  {why:32s} {n:5d}   dropped")
-    print(f"  {'kept':32s} {len(kept):5d}")
     print(f"held out {len(val_star)} kept traces for val (seed {a.seed}); {len(train_star)} for train")
     print(f"cipher share target {a.share:.3f} of the mix: {len(train_star)} x {reps} repeats = {len(train_star) * reps} cipher rows")
     print(f"train.jsonl: {len(train)} rows  {dict(sorted(cats.items()))}")
