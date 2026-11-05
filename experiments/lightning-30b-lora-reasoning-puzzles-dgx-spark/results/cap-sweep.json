@@ -1,0 +1,228 @@
+{
+  "caps": [
+    {
+      "cap": 7680,
+      "path": "/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare-300.csv",
+      "rows_scored": 300,
+      "n": 300,
+      "base_acc": 0.29,
+      "adapter_acc": 0.55,
+      "fixed": 96,
+      "broke": 18,
+      "gain": 0.26,
+      "ci95": [
+        0.19675139421826493,
+        0.3232486057817351
+      ],
+      "mcnemar_p": 4.7214331273392644e-14,
+      "per_category": {
+        "bit_ops": {
+          "n": 50,
+          "base": 1,
+          "adapter": 12,
+          "base_truncated": 49
+        },
+        "cipher": {
+          "n": 50,
+          "base": 18,
+          "adapter": 2,
+          "base_truncated": 34
+        },
+        "gravity": {
+          "n": 50,
+          "base": 11,
+          "adapter": 46,
+          "base_truncated": 42
+        },
+        "numeral": {
+          "n": 50,
+          "base": 49,
+          "adapter": 50,
+          "base_truncated": 1
+        },
+        "symbol": {
+          "n": 50,
+          "base": 5,
+          "adapter": 5,
+          "base_truncated": 45
+        },
+        "unit_conv": {
+          "n": 50,
+          "base": 3,
+          "adapter": 50,
+          "base_truncated": 47
+        }
+      },
+      "truncated": {
+        "base": 218,
+        "adapter": 0
+      }
+    },
+    {
+      "cap": 16384,
+      "path": "/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare-300-cap16k.csv",
+      "rows_scored": 300,
+      "changed_vs_previous": {
+        "base": {
+          "gained": 59,
+          "lost": 12
+        },
+        "adapter": {
+          "gained": 3,
+          "lost": 2
+        }
+      },
+      "n": 300,
+      "base_acc": 0.44666666666666666,
+      "adapter_acc": 0.5533333333333333,
+      "fixed": 63,
+      "broke": 31,
+      "gain": 0.10666666666666667,
+      "ci95": [
+        0.044484341680053795,
+        0.16884899165327955
+      ],
+      "mcnemar_p": 0.0012613865981312992,
+      "per_category": {
+        "bit_ops": {
+          "n": 50,
+          "base": 4,
+          "adapter": 13,
+          "base_truncated": 46
+        },
+        "cipher": {
+          "n": 50,
+          "base": 27,
+          "adapter": 2,
+          "base_truncated": 23
+        },
+        "gravity": {
+          "n": 50,
+          "base": 28,
+          "adapter": 46,
+          "base_truncated": 25
+        },
+        "numeral": {
+          "n": 50,
+          "base": 50,
+          "adapter": 50,
+          "base_truncated": 0
+        },
+        "symbol": {
+          "n": 50,
+          "base": 6,
+          "adapter": 5,
+          "base_truncated": 41
+        },
+        "unit_conv": {
+          "n": 50,
+          "base": 19,
+          "adapter": 50,
+          "base_truncated": 31
+        }
+      },
+      "truncated": {
+        "base": 166,
+        "adapter": 0
+      }
+    }
+  ],
+  "early_box": {
+    "7680": {
+      "bit_ops": {
+        "truncated": 49,
+        "no_box": 49,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "cipher": {
+        "truncated": 34,
+        "no_box": 32,
+        "last_correct": 2,
+        "any_correct": 2,
+        "first_correct": 2
+      },
+      "numeral": {
+        "truncated": 1,
+        "no_box": 1,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "unit_conv": {
+        "truncated": 47,
+        "no_box": 47,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "gravity": {
+        "truncated": 42,
+        "no_box": 37,
+        "last_correct": 3,
+        "any_correct": 3,
+        "first_correct": 2
+      },
+      "symbol": {
+        "truncated": 45,
+        "no_box": 36,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "all": {
+        "truncated": 218,
+        "no_box": 202,
+        "last_correct": 5,
+        "any_correct": 5,
+        "first_correct": 4
+      }
+    },
+    "16384": {
+      "bit_ops": {
+        "truncated": 46,
+        "no_box": 46,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "cipher": {
+        "truncated": 23,
+        "no_box": 23,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "unit_conv": {
+        "truncated": 31,
+        "no_box": 31,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "gravity": {
+        "truncated": 25,
+        "no_box": 17,
+        "last_correct": 6,
+        "any_correct": 6,
+        "first_correct": 4
+      },
+      "symbol": {
+        "truncated": 41,
+        "no_box": 36,
+        "last_correct": 0,
+        "any_correct": 0,
+        "first_correct": 0
+      },
+      "all": {
+        "truncated": 166,
+        "no_box": 153,
+        "last_correct": 6,
+        "any_correct": 6,
+        "first_correct": 4
+      }
+    }
+  },
+  "warnings": []
+}
