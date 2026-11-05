@@ -6,8 +6,8 @@ Three subcommands, run from anywhere (paths are relative to this file):
   select   write data/cipher-train.jsonl: the cipher rows of the original experiment's train.jsonl with the gold
            answer joined from its train.csv, for tools/sample_traces.py.
   build    read the sampler's output, keep the generations that finished with a correct first boxed answer, cut
-           each at the start of the line that holds that box, rewrap it as <think>...</think>\\boxed{}, drop rows
-           longer than --seq-length, hold out --val-holdout traces for val.jsonl, and mix the rest with the original
+           each at the start of the line that holds that box (or at the model's own </think>), rewrap it as
+           <think>...</think>\\boxed{}, drop rows longer than --seq-length, hold out --val-holdout traces for val.jsonl, and mix the rest with the original
            train.jsonl minus its cipher rows (repeated so cipher is --share of the mix). Writes data/train.jsonl,
            data/val.jsonl and results/star-dataset.json.
   check    render every row with the chat template and confirm it extends the inference prefix, the completion
@@ -76,9 +76,9 @@ def write_jsonl(path, rows):
 def star_completion(gen, answer):
     """(completion, None) for a usable generation, else (None, reason).
 
-    The generation is the text after the prompt's open <think>. Keep it if it finished, its first non-empty box
-    matches the answer and the think block was not closed before that box. Cut at the start of the line holding the
-    box so the trace ends on a complete sentence, then wrap in the layout the recipe trains on."""
+    The generation is the text after the prompt's open <think>. Keep it if it finished and its first non-empty box
+    matches the answer. Cut at the start of the line holding the box so the trace ends on a complete sentence, or at
+    the model's own </think> if it closed the block before the box, then wrap in the layout the recipe trains on."""
     if gen.get("finish") == "length":
         return None, "truncated"
     text = gen["text"]
@@ -88,9 +88,11 @@ def star_completion(gen, answer):
     box = first.group(1).strip()
     if not answers_match(box, answer):
         return None, "first_box_wrong"
-    if "</think>" in text[:first.start()]:
-        return None, "think_closed_early"
-    trace = text[:text.rfind("\n", 0, first.start()) + 1].rstrip()
+    close = text.find("</think>", 0, first.start())
+    if close != -1:  # the model closed its think block and boxed outside it: keep what it thought
+        trace = text[:close].rstrip()
+    else:
+        trace = text[:text.rfind("\n", 0, first.start()) + 1].rstrip()
     if not trace:
         return None, "empty_trace"
     return f"<think>\n{trace}\n</think>\n\\boxed{{{box}}}", None
@@ -231,7 +233,7 @@ def cmd_check(a):
                     not pre.endswith("<|im_end|>\n<|im_start|>assistant\n<think>\n"):
                 fail(f"{r['id']}: unexpected prefix {pre!r}")
             comp = r["completion"]
-            if not comp.startswith("<think>\n") or not re.search(r"\n</think>\n\\boxed\{[^}]+\}$", comp):
+            if not comp.startswith("<think>\n") or not re.search(r"\n</think>\n\\boxed\{.+\}$", comp, re.S):
                 fail(f"{r['id']}: completion layout is not <think>\\n...\\n</think>\\n\\boxed{{...}}: {comp[-80:]!r}")
             if comp.count("</think>") != 1:
                 fail(f"{r['id']}: {comp.count('</think>')} closing think tags")
@@ -265,7 +267,8 @@ def selftest():
     assert star_completion({"finish": "length", "text": text}, gold) == (None, "truncated")
     assert star_completion({"finish": "stop", "text": "thinking... no answer"}, gold) == (None, "no_box")
     assert star_completion({"finish": "stop", "text": "so \\boxed{dragon reads under the forest}"}, gold) == (None, "first_box_wrong")
-    assert star_completion({"finish": "stop", "text": "done</think>\nThe answer: \\boxed{dragon reads under forest}"}, gold) == (None, "think_closed_early")
+    comp, why = star_completion({"finish": "stop", "text": "done\n</think>\nThe answer: \\boxed{dragon reads under forest}"}, gold)
+    assert comp == "<think>\ndone\n</think>\n\\boxed{dragon reads under forest}", comp
     assert star_completion({"finish": "stop", "text": "\\boxed{dragon reads under forest}"}, gold) == (None, "empty_trace")
     # the model's own box text is kept (case differs from gold but matches under the metric)
     comp, why = star_completion({"finish": "stop", "text": "map found\nSo \\boxed{Dragon Reads Under Forest}"}, gold)
