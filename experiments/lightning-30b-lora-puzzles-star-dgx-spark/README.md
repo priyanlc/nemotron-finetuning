@@ -27,7 +27,7 @@ Then [Results](#results) and [Files](#files). Times marked estimate are replaced
 
 The sampler's input is the cipher rows of the original `train.jsonl` with the gold answer joined from `train.csv`: the prompt already carries the boxed-answer instruction and the 77-word vocabulary hint, so the base model sees exactly the text the adapter was trained on and is scored on. The test and val puzzles are never sampled.
 
-**The rule** (`star_completion` in [`data/make_star_jsonl.py`](data/make_star_jsonl.py)): keep a generation if it finished under the cap, its first non-empty `\boxed{}` matches the answer under the Kaggle metric (exact string or 1% numeric tolerance), and the think block was not closed before that box. Cut the text at the start of the line that holds the box, so the trace ends on a complete sentence, and wrap it as `<think>\n{trace}\n</think>\n\boxed{answer}`, the layout the original experiment trains on. The box keeps the model's own wording. Rows whose prompt plus completion exceed 8,192 tokens are dropped, never truncated, because a cut trace loses its box.
+**The rule** (`star_completion` in [`data/make_star_jsonl.py`](data/make_star_jsonl.py)): keep a generation if it finished under the cap and its first non-empty `\boxed{}` matches the answer under the Kaggle metric (exact string or 1% numeric tolerance). Cut the text at the start of the line that holds the box, so the trace ends on a complete sentence, or at the model's own `</think>` when it closed the block before boxing, and wrap it as `<think>\n{trace}\n</think>\n\boxed{answer}`, the layout the original experiment trains on. The box keeps the model's own wording. Rows whose prompt plus completion exceed 8,192 tokens are dropped, never truncated, because a cut trace loses its box.
 
 Three facts from the earlier runs shaped this. At the 7,680-token cap the base finishes 16 of 50 test cipher puzzles and 14 of those have a correct first box, so about 28% of the training puzzles should yield a trace. The first box sits at the very end of the trace, so cutting at it removes under 1% of the text; the kept traces are 4,000 to 7,500 tokens where the scripted completions were about 50, which is why `seq_length` goes to 8,192. And the base writes its box inside the think block in 22 of 23 cases, hence the rewrap.
 
@@ -70,7 +70,7 @@ docker exec -it lightning-lora python3 $S/data/make_star_jsonl.py build --sample
 docker exec -it lightning-lora python3 $S/data/make_star_jsonl.py check
 ```
 
-`build` prints what it dropped and why (truncated, first box wrong, think block closed early, over 8,192 tokens), the holdout, the repeat factor, the per-category counts of the new `train.jsonl`, and the length histogram; the same goes to `results/star-dataset.json`, which is committed. `check` fails on any completion that does not start with `<think>\n` and end with `</think>\n\boxed{...}`, any row that does not render to the inference prefix plus the completion, and any row over 8,192 tokens.
+`build` prints what it dropped and why (truncated, no box, first box wrong, over 8,192 tokens), the holdout, the repeat factor, the per-category counts of the new `train.jsonl`, and the length histogram; the same goes to `results/star-dataset.json`, which is committed. `check` fails on any completion that does not start with `<think>\n` and end with `</think>\n\boxed{...}`, any row that does not render to the inference prefix plus the completion, and any row over 8,192 tokens.
 
 ## Step 5: Write the recipe config
 
