@@ -11,13 +11,14 @@ Run inside the nemo-automodel container, which has transformers, the cached toke
   docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --n 12   # defaults: this
   experiment's data/test.jsonl and logs/ under /shared/nemotron-finetuning/experiments/
 Options: --url, --base-name, --adapter-name, --n rows to score (0 = all), --max-tokens (7680), --max-model-len (0 = ask
-the server), --ids-from and --only-truncated (rescore an earlier run's puzzles, or just the ones that hit the cap),
+the server), --ids-from and --only-truncated (re-check an earlier run's puzzles, or just the ones that hit the cap),
 --timeout, --concurrency (16), --out (CSV per row; a .json summary is written next to it), --selftest (checks the
 statistics, needs no server).
 
-Rescoring at a higher cap (the server must be started with a larger --max-model-len first):
-  compare_puzzles.py --ids-from logs/compare-300.csv --only-truncated --max-tokens 16384 --out logs/compare-300-cap16k.csv
-then cap_sweep.py merges the runs into one table per cap.
+Rescoring at a higher cap (the server must be started with a larger --max-model-len first): re-score the whole set,
+  compare_puzzles.py --n 300 --max-tokens 16384 --concurrency 32 --out logs/compare-300-cap16k.csv
+then cap_sweep.py merges the runs into one table per cap. Greedy output drifts between runs on this server, so a
+merged accuracy built from --only-truncated re-runs is biased toward the base model; use that option for inspection.
 """
 import argparse
 import csv

@@ -106,14 +106,14 @@ The `.json` summary records `max_tokens`, the server window, `ids_from` and `onl
 
 ### Rescoring at a higher cap
 
-Puzzles that finished under one cap give the same greedy output under a larger one, so only the generations that hit the cap carry new information. Start the server with a larger `--max-model-len`, then re-run just those puzzles, chaining caps:
+Start the server with a larger `--max-model-len`, then re-score the whole puzzle set at each cap:
 
 ```bash
-compare_puzzles.py --ids-from logs/compare-300.csv --only-truncated --max-tokens 16384 --out logs/compare-300-cap16k.csv
-compare_puzzles.py --ids-from logs/compare-300-cap16k.csv --only-truncated --max-tokens 32768 --out logs/compare-300-cap32k.csv
+compare_puzzles.py --n 300 --max-tokens 16384 --concurrency 32 --out logs/compare-300-cap16k.csv
+compare_puzzles.py --n 300 --max-tokens 32768 --concurrency 32 --out logs/compare-300-cap32k.csv
 ```
 
-The adapter is re-run on the same puzzles so the statistics stay paired; it finishes in a few hundred tokens, so that costs little. `cap_sweep.py` below merges the runs. The [reasoning-puzzles follow-up](../experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/higher-cap-rescore.md) has the full procedure.
+Re-score everything, not only the puzzles that hit the previous cap. Greedy decoding does not repeat exactly from run to run on this server (vLLM's batching shifts bf16 arithmetic, and on a mixture-of-experts model that can flip an expert choice and change the whole trace), so re-running only the base's failures would re-roll its losses and never its wins. `--ids-from` and `--only-truncated` remain for targeted re-checks and for inspecting a subset, but a merged accuracy built on them is biased in the base model's favour. `cap_sweep.py` below merges the runs. The [reasoning-puzzles follow-up](../experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/higher-cap-rescore.md) has the full procedure.
 
 ## cap_sweep.py
 
@@ -125,9 +125,9 @@ python3 cap_sweep.py logs/compare-300.csv logs/compare-300-cap16k.csv logs/compa
 python3 cap_sweep.py --selftest
 ```
 
-Pass the per-row CSVs lowest cap first (they are sorted by cap anyway). Each is read with its sibling `.json`, which gives the cap, and its `-generations.jsonl`. The first run must cover the whole puzzle set. Each later run may cover a subset and replaces those rows whole: a higher-cap generation is a fresh request, not a continuation of the earlier text, because vLLM's batching can change a greedy prefix. If a puzzle truncated at one cap is missing from the next run, the script keeps its lower-cap row and prints a warning.
+Pass the per-row CSVs lowest cap first (they are sorted by cap anyway). Each is read with its sibling `.json`, which gives the cap, and its `-generations.jsonl`. The first run must cover the whole puzzle set. Later runs normally cover it too; a run that covers a subset replaces only those rows, and if a puzzle truncated at one cap is missing from the next run the script keeps its lower-cap row and prints a warning. Rows are replaced whole: a higher-cap generation is a fresh request, not a continuation of the earlier text.
 
-**The sweep table.** For each cap, after overlaying every run at or below it: base and adapter accuracy, the gain with its 95% interval and McNemar p (the same functions as `compare_puzzles.py`), the number of base generations still truncated, and per-category accuracy. The lowest-cap row reproduces the original run exactly.
+**The sweep table.** For each cap, after overlaying every run at or below it: base and adapter accuracy, the gain with its 95% interval and McNemar p (the same functions as `compare_puzzles.py`), the number of base generations still truncated, and per-category accuracy. Each row after the first also counts the answers each model gained and lost against the previous cap, so run-to-run churn can be told from a trend. The lowest-cap row reproduces the original run exactly.
 
 **The early-box check.** Among the base generations that hit a run's cap, per category: how many had no box at all, how many had a correct last box (what the scorer counted), how many had a correct box anywhere in the text, and how many had a correct first box. The last two bound what the base would score if it could stop at its first answer, and separate puzzles where the cap hid a correct answer from puzzles where the base was not getting there. This needs only the existing `-generations.jsonl`, so it runs before any GPU time is spent.
 

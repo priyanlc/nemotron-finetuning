@@ -2,9 +2,10 @@
 """Merge compare_puzzles.py runs made at increasing token caps into one table per cap, and measure how often a
 generation that hit the cap had already boxed a correct answer.
 
-Pass the per-row CSVs lowest cap first. The first run must cover the whole puzzle set; each later run may cover a
-subset (typically the puzzles that hit the previous cap, scored with --ids-from --only-truncated) and replaces those
-rows whole. Each CSV is read with its sibling .json (for max_tokens) and -generations.jsonl (for the early-box check).
+Pass the per-row CSVs lowest cap first. The first run must cover the whole puzzle set; later runs normally do too
+(greedy output drifts between runs, so re-scoring only the truncated puzzles biases the merge). A run that covers a
+subset replaces those rows whole. Each row after the first also counts answers gained and lost against the previous
+cap. Each CSV is read with its sibling .json (for max_tokens) and -generations.jsonl (for the early-box check).
 
   python3 cap_sweep.py logs/compare-300.csv                                   # one run: the early-box check only
   python3 cap_sweep.py logs/compare-300.csv logs/compare-300-cap16k.csv logs/compare-300-cap32k.csv --out results/cap-sweep.json
@@ -117,23 +118,35 @@ def sweep(runs):
         unknown = [i for i in run["order"] if i not in state]
         if unknown:
             raise SystemExit(f"{run['path']}: {len(unknown)} ids are not in the first run ({unknown[:3]}...)")
+        changed = {m: {"gained": 0, "lost": 0} for m in ("base", "adapter")}
         for i in run["order"]:
+            for m in changed:
+                before, after = int(state[i][f"{m}_ok"]), int(run["rows"][i][f"{m}_ok"])
+                changed[m]["gained"] += after and not before
+                changed[m]["lost"] += before and not after
             state[i] = run["rows"][i]
         missed = sorted(truncated_before - set(run["order"]))
         if missed:
             warnings.append(f"cap {run['cap']}: {len(missed)} puzzles truncated at the previous cap were not re-run "
                             f"(e.g. {', '.join(missed[:3])}); their lower-cap results are kept")
-        caps.append({"cap": run["cap"], "path": run["path"], "rows_scored": len(run["order"]), **table(order, state)})
+        caps.append({"cap": run["cap"], "path": run["path"], "rows_scored": len(run["order"]),
+                     "changed_vs_previous": changed, **table(order, state)})
     return caps, warnings
 
 
 def print_sweep(caps, warnings):
     cats = sorted(caps[0]["per_category"])
-    print(f"{'cap':>7}{'scored':>8}{'base':>8}{'adapter':>9}{'gain':>8}{'95% CI':>18}{'p':>8}{'base trunc':>12}")
+    print(f"{'cap':>7}{'scored':>8}{'base':>8}{'adapter':>9}{'gain':>8}{'95% CI':>18}{'p':>8}{'base trunc':>12}"
+          f"{'base +/-':>10}{'adapter +/-':>13}")
     for c in caps:
         lo, hi = c["ci95"]
+        ch = c.get("changed_vs_previous")
+        flips = (f"{'+%d/-%d' % (ch['base']['gained'], ch['base']['lost']):>10}"
+                 f"{'+%d/-%d' % (ch['adapter']['gained'], ch['adapter']['lost']):>13}") if ch else f"{'':>10}{'':>13}"
         print(f"{c['cap']:>7}{c['rows_scored']:>8}{c['base_acc']:>8.3f}{c['adapter_acc']:>9.3f}{c['gain']:>+8.3f}"
-              f"{lo:>+9.3f} to {hi:+.3f}{c['mcnemar_p']:>8.3f}{c['truncated']['base']:>8}/{c['n']}")
+              f"{lo:>+9.3f} to {hi:+.3f}{c['mcnemar_p']:>8.3f}{c['truncated']['base']:>8}/{c['n']}{flips}")
+    if len(caps) > 1:
+        print("+/- = answers gained/lost against the previous cap; both directions together measure run-to-run churn")
     print(f"\nbase accuracy by category and cap ({', '.join(str(c['cap']) for c in caps)}); adapter in brackets")
     for cat in cats:
         cells = []
@@ -200,6 +213,8 @@ def selftest():
         assert caps[0]["fixed"] == 2 and caps[0]["broke"] == 1
         assert caps[1]["base_acc"] == 4 / 6 and caps[1]["adapter_acc"] == 4 / 6 and caps[1]["truncated"]["base"] == 1
         assert caps[1]["fixed"] == 1 and caps[1]["broke"] == 1 and caps[1]["rows_scored"] == 3
+        assert caps[1]["changed_vs_previous"] == {"base": {"gained": 1, "lost": 0}, "adapter": {"gained": 0, "lost": 0}}
+        assert "changed_vs_previous" not in caps[0]
         assert caps[1]["per_category"]["y"] == {"n": 3, "base": 2, "adapter": 2, "base_truncated": 1}
         eb = early_box(runs[1])
         assert eb["y"] == {"truncated": 3, "no_box": 1, "last_correct": 1, "any_correct": 2, "first_correct": 2}, eb
@@ -208,6 +223,7 @@ def selftest():
         partial = write_runs(d, "partial", 300, [row("p4", "y", "4", "4", 1, "stop", "0", 0)], [])
         caps, warnings = sweep([load_run(low, "b", "a"), load_run(partial, "b", "a")])
         assert len(warnings) == 1 and "2 puzzles" in warnings[0] and caps[1]["base_acc"] == 4 / 6
+        assert caps[1]["changed_vs_previous"]["base"] == {"gained": 1, "lost": 0}
         print_sweep(caps, warnings)
         print_early_box(runs[1], eb)
     print("selftest OK")
