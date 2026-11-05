@@ -1,0 +1,35 @@
+# Appended to a copy of nemotron_nano_v3_5_lightning_singlegpu_lora.yaml after its HellaSwag `dataset:` block has
+# been deleted (README.md, step 5), exactly as the reasoning-puzzles experiment's custom-dataset-block.yaml was.
+# Two differences only: the paths point at the JSONL files data/make_star_jsonl.py writes, and seq_length is 8192
+# because the STaR cipher traces run to 7,500 tokens. Rows longer than that were dropped by `build`, so
+# `truncation: longest_first` never fires; `check` fails if it would.
+
+dataset:
+  _target_: nemo_automodel.components.datasets.llm.column_mapped_text_instruction_dataset.ColumnMappedTextInstructionDataset
+  path_or_dataset_id: /shared/nemotron-finetuning/experiments/lightning-30b-lora-puzzles-star-dgx-spark/data/train.jsonl
+  split: train
+  column_mapping:
+    question: prompt
+    answer: completion
+  use_hf_chat_template: true
+  answer_only_loss_mask: true
+  seq_length: 8192
+  padding: do_not_pad
+  truncation: longest_first
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.llm.column_mapped_text_instruction_dataset.ColumnMappedTextInstructionDataset
+  path_or_dataset_id: /shared/nemotron-finetuning/experiments/lightning-30b-lora-puzzles-star-dgx-spark/data/val.jsonl
+  split: train
+  column_mapping:
+    question: prompt
+    answer: completion
+  use_hf_chat_template: true
+  answer_only_loss_mask: true
+  seq_length: 8192
+  padding: do_not_pad
+  truncation: longest_first
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater
