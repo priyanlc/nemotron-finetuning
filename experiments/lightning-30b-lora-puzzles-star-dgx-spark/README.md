@@ -23,6 +23,8 @@
 
 Then [Results](#results) and [Files](#files). Times marked estimate are replaced with measured values as the steps are run.
 
+Steps 4 to 9 can run unattended: [`star_chain.sh`](star_chain.sh) waits for the sampler's summary file, then runs them in order with a gate after each (kept traces, `check`, the config's two `seq_length` lines, the decode check, the smoke run's peak memory under 85 GiB, a `LOWEST_VAL` adapter, the server listing all three model names, both `.json` summaries) and appends one line per stage to `logs/chain.status`. Start it on the Spark host with `nohup setsid bash $S/star_chain.sh > $S/logs/chain.log 2>&1 &`; the first failed gate stops it with a `FAILED` line naming the log to read.
+
 ## What the data looks like
 
 The sampler's input is the cipher rows of the original `train.jsonl` with the gold answer joined from `train.csv`: the prompt already carries the boxed-answer instruction and the 77-word vocabulary hint, so the base model sees exactly the text the adapter was trained on and is scored on. The test and val puzzles are never sampled.
@@ -143,6 +145,7 @@ Base and published-adapter columns are the original experiment's October run at 
 |---|---|
 | [`data/make_star_jsonl.py`](data/make_star_jsonl.py) | `select`, `build`, `check` and `--selftest`; the STaR rule and the mix live here. |
 | [`configs/star-dataset-block.yaml`](configs/star-dataset-block.yaml) | The dataset block appended to the recipe copy: new paths, `seq_length: 8192`. |
+| [`star_chain.sh`](star_chain.sh), [`data/decode_check.py`](data/decode_check.py) | Steps 4 to 9 unattended, with gates; the decode check the chain runs before training. |
 | [`../../tools/sample_traces.py`](../../tools/sample_traces.py) | The sampler; shared with any later STaR pass on other categories. |
 | `data/cipher-train.jsonl`, `data/train.jsonl`, `data/val.jsonl` | Generated, git-ignored. |
 | `logs/star-cipher-7680.{jsonl,json,log}`, `logs/compare-300-*.{csv,json,-generations.jsonl}` | Generated on the Spark, git-ignored. |
