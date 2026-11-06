@@ -10,8 +10,15 @@ the Kaggle scorer does. It reports accuracy per category, answers fixed and brok
 Run inside the nemo-automodel container, which has transformers, the cached tokenizer and the host network:
   docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/compare_puzzles.py --n 12   # defaults: this
   experiment's data/test.jsonl and logs/ under /shared/nemotron-finetuning/experiments/
-Options: --url, --base-name, --adapter-name, --n rows to score (0 = all), --max-tokens (7680), --concurrency (16),
---out (CSV per row; a .json summary is written next to it), --selftest (checks the statistics, needs no server).
+Options: --url, --base-name, --adapter-name, --n rows to score (0 = all), --max-tokens (7680), --max-model-len (0 = ask
+the server), --ids-from and --only-truncated (re-check an earlier run's puzzles, or just the ones that hit the cap),
+--timeout, --concurrency (16), --out (CSV per row; a .json summary is written next to it), --selftest (checks the
+statistics, needs no server).
+
+Rescoring at a higher cap (the server must be started with a larger --max-model-len first): re-score the whole set,
+  compare_puzzles.py --n 300 --max-tokens 16384 --concurrency 32 --out logs/compare-300-cap16k.csv
+then cap_sweep.py merges the runs into one table per cap. Greedy output drifts between runs on this server, so a
+merged accuracy built from --only-truncated re-runs is biased toward the base model; use that option for inspection.
 """
 import argparse
 import csv
@@ -25,7 +32,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 MODEL = "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16"
-MAX_MODEL_LEN = 8192
+DEFAULT_MAX_MODEL_LEN = 8192  # used only when the server does not report its --max-model-len
 
 
 def parse_args():
@@ -35,7 +42,15 @@ def parse_args():
     ap.add_argument("--adapter-name", default="lightning-puzzles")
     ap.add_argument("--data", default="/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/data/test.jsonl")
     ap.add_argument("--n", type=int, default=0, help="rows to score, 0 = all")
-    ap.add_argument("--max-tokens", type=int, default=7680)
+    ap.add_argument("--ids-from", default=None, metavar="CSV",
+                    help="score the puzzles of an earlier run's per-row CSV, in its order, instead of --n")
+    ap.add_argument("--only-truncated", action="store_true",
+                    help="with --ids-from: keep only the puzzles where the base or the adapter hit the token limit")
+    ap.add_argument("--max-tokens", type=int, default=7680, help="generation budget per request")
+    ap.add_argument("--max-model-len", type=int, default=0,
+                    help="the server's context window; 0 reads it from /models (falls back to %d)" % DEFAULT_MAX_MODEL_LEN)
+    ap.add_argument("--timeout", type=int, default=0,
+                    help="seconds per request; 0 = max(3600, 2 * --max-tokens), enough for one slow stream at the cap")
     ap.add_argument("--concurrency", type=int, default=16)
     ap.add_argument("--out", default="/shared/nemotron-finetuning/experiments/lightning-30b-lora-reasoning-puzzles-dgx-spark/logs/compare_puzzles.csv")
     ap.add_argument("--selftest", action="store_true")
@@ -77,6 +92,13 @@ def extract_boxed_answer(text):
     return content or None
 
 
+def all_boxed_answers(text):
+    """Every non-empty \\boxed{...} in order of appearance (flat braces only); for the early-box analysis."""
+    if text is None:
+        return []
+    return [m.strip() for m in re.findall(r"\\boxed\{([^}]*)\}", text) if m.strip()]
+
+
 def answers_match(pred, gold):
     """Exact string (case-insensitive) or 1% relative tolerance for numbers."""
     if pred is None:
@@ -104,6 +126,34 @@ def paired_ci(fixed, broke, n):
     return d, d - 1.96 * se, d + 1.96 * se
 
 
+def select_rows(rows, a):
+    """The puzzles to score: an earlier run's ids (optionally only the truncated ones), or an evenly spread --n."""
+    if a.ids_from:
+        by_id = {r["id"]: r for r in rows}
+        wanted = []
+        with open(a.ids_from, newline="") as f:
+            for prev in csv.DictReader(f):
+                if a.only_truncated and "length" not in (prev.get("base_finish"), prev.get("adapter_finish")):
+                    continue
+                if prev["id"] not in by_id:
+                    raise SystemExit(f"id {prev['id']} from {a.ids_from} is not in {a.data}")
+                wanted.append(by_id[prev["id"]])
+        if not wanted:
+            raise SystemExit(f"nothing to score: no rows selected from {a.ids_from}")
+        return wanted
+    if a.n:  # an evenly spread subset, so every category is represented (test.jsonl is grouped by category)
+        return rows[::max(1, len(rows) // a.n)][:a.n]
+    return rows
+
+
+def served_max_model_len(models, name):
+    """The context window vLLM reports for a served name in /v1/models, or None."""
+    for m in models:
+        if m.get("id") == name and m.get("max_model_len"):
+            return int(m["max_model_len"])
+    return None
+
+
 def selftest():
     p = mcnemar_exact(80, 53)
     d, lo, hi = paired_ci(80, 53, 1000)
@@ -111,8 +161,28 @@ def selftest():
     assert 0.020 < p < 0.030 and abs(lo - 0.005) < 0.002 and abs(hi - 0.049) < 0.002
     assert extract_boxed_answer("so <think>...</think>\n\\boxed{10010111}") == "10010111"
     assert extract_boxed_answer("\\boxed{}\n then \\boxed{cat imagines book}") == "cat imagines book"
+    assert all_boxed_answers("\\boxed{}\n \\boxed{a b}, later \\boxed{c}") == ["a b", "c"]
     assert answers_match("154.6", "154.62") and not answers_match("157", "154.62") and answers_match("XXXVIII", "xxxviii")
     assert extract_boxed_answer("no box here") is None and not answers_match(None, "1")
+    assert served_max_model_len([{"id": "x", "max_model_len": 32768}, {"id": "y"}], "x") == 32768
+    assert served_max_model_len([{"id": "y"}], "y") is None
+
+    class A:  # select_rows on an in-memory CSV
+        ids_from, only_truncated, n, data = None, False, 2, "rows"
+    rows = [{"id": str(i), "category": "c", "prompt": "p", "answer": "1"} for i in range(6)]
+    assert [r["id"] for r in select_rows(rows, A())] == ["0", "3"]
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["id", "base_finish", "adapter_finish"])
+        w.writeheader()
+        w.writerows([{"id": "4", "base_finish": "length", "adapter_finish": "stop"},
+                     {"id": "1", "base_finish": "stop", "adapter_finish": "stop"},
+                     {"id": "2", "base_finish": "stop", "adapter_finish": "length"}])
+    A.ids_from = f.name
+    assert [r["id"] for r in select_rows(rows, A())] == ["4", "1", "2"]
+    A.only_truncated = True
+    assert [r["id"] for r in select_rows(rows, A())] == ["4", "2"]
+    os.unlink(f.name)
     print("selftest OK")
 
 
@@ -122,27 +192,40 @@ def main():
         return selftest()
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(MODEL)
-    rows = [json.loads(l) for l in open(a.data) if l.strip()]
-    if a.n:  # an evenly spread subset, so every category is represented (test.jsonl is grouped by category)
-        rows = rows[::max(1, len(rows) // a.n)][:a.n]
-    served = [m["id"] for m in call(a.url, "/models")["data"]]
+    rows = select_rows([json.loads(l) for l in open(a.data) if l.strip()], a)
+    models = call(a.url, "/models")["data"]
+    served = [m["id"] for m in models]
     for name in (a.base_name, a.adapter_name):
         if name not in served:
             raise SystemExit(f"'{name}' isn't served (have {served}). Check --served-model-name and --lora-modules.")
+    max_model_len = a.max_model_len or served_max_model_len(models, a.base_name)
+    if not max_model_len:
+        max_model_len = DEFAULT_MAX_MODEL_LEN
+        print(f"the server does not report its context window; assuming --max-model-len {max_model_len}")
+    timeout = a.timeout or max(3600, 2 * a.max_tokens)
 
     def render(prompt):
         return tok.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False,
                                        add_generation_prompt=True, enable_thinking=True)
 
+    longest_prompt = max(len(tok(render(r["prompt"]), add_special_tokens=False)["input_ids"]) for r in rows)
+    if longest_prompt + a.max_tokens > max_model_len:
+        print(f"note: --max-tokens {a.max_tokens} plus the longest prompt ({longest_prompt} tokens) exceeds the "
+              f"server's window of {max_model_len}; the budget is trimmed per request, so the effective cap is "
+              f"{max_model_len - longest_prompt} to {max_model_len - min(len(tok(render(r['prompt']), add_special_tokens=False)['input_ids']) for r in rows)} tokens")
+    print(f"scoring {len(rows)} puzzles, cap {a.max_tokens} tokens, server window {max_model_len}, "
+          f"timeout {timeout} s per request, concurrency {a.concurrency}", flush=True)
+
     def job(row, model):
         text = render(row["prompt"])
-        budget = min(a.max_tokens, MAX_MODEL_LEN - len(tok(text, add_special_tokens=False)["input_ids"]))
-        r = call(a.url, "/completions", {"model": model, "prompt": text, "max_tokens": budget, "temperature": 0})
+        budget = min(a.max_tokens, max_model_len - len(tok(text, add_special_tokens=False)["input_ids"]))
+        r = call(a.url, "/completions", {"model": model, "prompt": text, "max_tokens": budget, "temperature": 0},
+                 timeout=timeout)
         ch = r["choices"][0]
         pred = extract_boxed_answer(ch["text"])
         return {"id": row["id"], "model": model, "pred": pred, "ok": answers_match(pred, row["answer"]),
                 "finish": ch.get("finish_reason"), "tokens": r.get("usage", {}).get("completion_tokens"),
-                "text": ch["text"]}
+                "budget": budget, "text": ch["text"]}
 
     t0, results = time.time(), {}
     jobs = [(row, m) for row in rows for m in (a.base_name, a.adapter_name)]
@@ -182,7 +265,9 @@ def main():
         w.writeheader(); w.writerows(out_rows)
     summary = {"n": n, "base_acc": base_ok / n, "adapter_acc": ad_ok / n, "fixed": fixed, "broke": broke,
                "gain": d, "ci95": [lo, hi], "mcnemar_p": p, "per_category": per, "truncated": trunc,
-               "seconds": time.time() - t0, "max_tokens": a.max_tokens}
+               "seconds": time.time() - t0, "max_tokens": a.max_tokens, "max_model_len": max_model_len,
+               "ids_from": a.ids_from, "only_truncated": a.only_truncated,
+               "base_name": a.base_name, "adapter_name": a.adapter_name}
     with open(a.out.rsplit(".", 1)[0] + ".json", "w") as f:
         json.dump(summary, f, indent=2)
     with open(a.out.rsplit(".", 1)[0] + "-generations.jsonl", "w") as f:

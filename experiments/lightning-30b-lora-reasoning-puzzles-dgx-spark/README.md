@@ -28,7 +28,7 @@ All steps run on the Spark, in order.
 | 12 | [Run the 300-puzzle comparison](#step-12-run-the-300-puzzle-comparison) | Spark host, executing inside `lightning-lora` | About 3.5 hours (measured) |
 | 13 | [Inspect the generations and write up](#step-13-inspect-the-generations-and-write-up) | Spark host | 3 to 4 hours |
 
-**After the walkthrough:** [Results](#results) · [If it fails](if-it-fails.md) · [Files](#files-in-this-experiment) · [Licences](#third-party-material-and-licences) · [References](#references)
+**After the walkthrough:** [Results](#results) · [If it fails](if-it-fails.md) · [Higher-cap rescoring](higher-cap-rescore.md) · [Files](#files-in-this-experiment) · [Licences](#third-party-material-and-licences) · [References](#references)
 
 ## Data
 
@@ -341,7 +341,7 @@ vllm serve nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16 \
 
 ### Step 11: Time the scorer on 12 puzzles
 
-[`tools/compare_puzzles.py`](../../tools/compare_puzzles.py) scores both served models on `test.jsonl` the way the competition does: greedy decoding, up to 7,680 new tokens, the last `\boxed{…}` taken as the answer, and no box or a truncated generation counted wrong. It reports per-category accuracy, answers fixed and broken, the gain with a paired 95% interval and an exact McNemar p-value. Method and options: [tools/README.md](../../tools/README.md#compare_puzzlespy).
+[`tools/compare_puzzles.py`](../../tools/compare_puzzles.py) scores both served models on `test.jsonl` the way the competition does: greedy decoding, up to 7,680 new tokens, the last `\boxed{…}` taken as the answer, and no box counted wrong (a generation cut off by the cap is scored by whatever box it had written, usually none). It reports per-category accuracy, answers fixed and broken, the gain with a paired 95% interval and an exact McNemar p-value. Method and options: [tools/README.md](../../tools/README.md#compare_puzzlespy).
 
 **Run on the Spark host, in a terminal separate from the server.** The script runs inside `lightning-lora`, which has transformers, the cached tokenizer and the host network; its defaults are this experiment's `data/test.jsonl` and `logs/`. Self-test, then 12 puzzles, two per category:
 
@@ -415,19 +415,23 @@ Trained 200 steps on one GB10 (about 62 GiB, validation loss 0.530 at step 19 to
 
 Read honestly: the base model hit the 7,680-token cap on 218 of 300 puzzles and never boxed an answer there; the adapter truncated 0 of 300. Most of the gain is length discipline, the adapter finishing and always boxing, which is what carries unit conversion and gravity from near-zero to near-perfect. The counterweight is cipher, where the adapter regressed (0.36 to 0.04): its concise, answer-aware training traces make it box a fluent but wrong guess on the one category that rewards patient decryption. Symbols stay flat, matching their thin trace coverage. The full 600-puzzle run was not needed; this result is already decisive (p well below 0.001).
 
+How much of the gain survives when the base model has room to finish is a separate follow-up, [higher-cap-rescore.md](higher-cap-rescore.md); its numbers go here once those runs have been made.
+
 ## Files in this experiment
 
 | Path | What it is |
 |---|---|
 | `README.md` | This guide. |
 | `if-it-fails.md` | Failures specific to this experiment, and what to do. |
+| `higher-cap-rescore.md` | Follow-up: rescore the truncated puzzles with a larger token cap and merge the results. Adds files, changes none. |
 | `requirements.txt` | Pinned packages for the venv of steps 2 to 5. |
 | `data/make_puzzle_jsonl.py` | Builds and checks the JSONL files (steps 4 and 5). |
 | `data/README.md` | The data files, licence and checksum. |
 | `configs/custom-dataset-block.yaml` | Dataset blocks appended in step 7. |
 | `configs/puzzles_lora.yaml` | Step 7's recipe with the puzzle dataset. |
 | `configs/nemotron_nano_v3_5_lightning_singlegpu_lora.yaml` | NVIDIA's recipe, verbatim; step 7 copies it. |
-| `../../tools/compare_puzzles.py` | The scorer (steps 11 and 12). |
+| `../../tools/compare_puzzles.py` | The scorer (steps 11 and 12; also the follow-up). |
+| `../../tools/cap_sweep.py` | Merges runs at increasing caps and checks what truncated generations had already boxed (the follow-up only). |
 | `assets/` | The diagrams and `diagrams.py`, which draws them. |
 
 ## Third-party material and licences
