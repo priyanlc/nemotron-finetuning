@@ -1,0 +1,56 @@
+{
+  "n": 300,
+  "base_acc": 0.5566666666666666,
+  "adapter_acc": 0.6233333333333333,
+  "fixed": 29,
+  "broke": 9,
+  "gain": 0.06666666666666667,
+  "ci95": [
+    0.027105368706459444,
+    0.1062279646268739
+  ],
+  "mcnemar_p": 0.0016580525261815637,
+  "per_category": {
+    "bit_ops": {
+      "n": 50,
+      "base": 13,
+      "adapter": 15
+    },
+    "cipher": {
+      "n": 50,
+      "base": 2,
+      "adapter": 22
+    },
+    "gravity": {
+      "n": 50,
+      "base": 47,
+      "adapter": 46
+    },
+    "numeral": {
+      "n": 50,
+      "base": 50,
+      "adapter": 50
+    },
+    "symbol": {
+      "n": 50,
+      "base": 5,
+      "adapter": 4
+    },
+    "unit_conv": {
+      "n": 50,
+      "base": 50,
+      "adapter": 50
+    }
+  },
+  "truncated": {
+    "lightning-puzzles": 0,
+    "lightning-star": 28
+  },
+  "seconds": 3527.3304901123047,
+  "max_tokens": 7680,
+  "max_model_len": 8192,
+  "ids_from": null,
+  "only_truncated": false,
+  "base_name": "lightning-puzzles",
+  "adapter_name": "lightning-star"
+}

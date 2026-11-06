@@ -1,0 +1,56 @@
+{
+  "n": 300,
+  "base_acc": 0.2966666666666667,
+  "adapter_acc": 0.6266666666666667,
+  "fixed": 105,
+  "broke": 6,
+  "gain": 0.33,
+  "ci95": [
+    0.27217723170468805,
+    0.387822768295312
+  ],
+  "mcnemar_p": 1.8478334088755076e-24,
+  "per_category": {
+    "bit_ops": {
+      "n": 50,
+      "base": 2,
+      "adapter": 15
+    },
+    "cipher": {
+      "n": 50,
+      "base": 13,
+      "adapter": 22
+    },
+    "gravity": {
+      "n": 50,
+      "base": 15,
+      "adapter": 46
+    },
+    "numeral": {
+      "n": 50,
+      "base": 50,
+      "adapter": 50
+    },
+    "symbol": {
+      "n": 50,
+      "base": 3,
+      "adapter": 5
+    },
+    "unit_conv": {
+      "n": 50,
+      "base": 6,
+      "adapter": 50
+    }
+  },
+  "truncated": {
+    "lightning-base": 216,
+    "lightning-star": 28
+  },
+  "seconds": 14118.858034849167,
+  "max_tokens": 7680,
+  "max_model_len": 32768,
+  "ids_from": null,
+  "only_truncated": false,
+  "base_name": "lightning-base",
+  "adapter_name": "lightning-star"
+}
