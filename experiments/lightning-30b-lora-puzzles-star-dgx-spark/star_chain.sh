@@ -8,6 +8,8 @@
 #   S=~/nemo-shared/nemotron-finetuning/experiments/lightning-30b-lora-puzzles-star-dgx-spark
 #   nohup setsid bash $S/star_chain.sh > $S/logs/chain.log 2>&1 &
 #   tail -f $S/logs/chain.status
+# SKIP_TO=train restarts at step 7 once a smoke run has been judged by hand (the built set, config and
+# decode check are reused); MEM_LIMIT (GiB) and MAX_MODEL_LEN can be overridden the same way.
 #
 # Gates: kept traces >= MIN_KEPT; check passes; config has two seq_length lines and no HellaSwag; decode
 # check passes; smoke run finishes 20 steps with finite loss and peak mem under MEM_LIMIT GiB; the 200-step
@@ -25,6 +27,7 @@ MIN_KEPT=${MIN_KEPT:-200}
 MEM_LIMIT=${MEM_LIMIT:-85}
 MAX_MODEL_LEN=${MAX_MODEL_LEN:-32768}
 SAMPLER_STALL_S=7200
+SKIP_TO=${SKIP_TO:-}
 
 say()  { echo "$(date +'%Y-%m-%d %H:%M:%S') $*" | tee -a "$STATUS"; }
 fail() { say "FAILED $*"; exit 1; }
@@ -39,8 +42,9 @@ wait_memory() {                                                # wait until the 
 }
 
 mkdir -p "$S/logs" "$S/checkpoints" "$S/results"
-say "START chain pid $$"
+say "START chain pid $$${SKIP_TO:+ (skip to $SKIP_TO, mem limit $MEM_LIMIT)}"
 
+if [ "$SKIP_TO" != "train" ]; then
 # ---- step 3, wait for the sampler ---------------------------------------------------------------------
 JSON=$S/logs/star-cipher-7680.json
 JSONL=$S/logs/star-cipher-7680.jsonl
@@ -86,6 +90,13 @@ say "GPU_FREE vllm-lightning stopped and removed"
 inlora "python3 $SC/data/decode_check.py 8192" > "$S/logs/chain-decode.log" 2>&1 || fail "decode check (see logs/chain-decode.log)"
 say "DECODE $(tail -n 2 "$S/logs/chain-decode.log" | head -n 1)"
 
+SMOKE=star-test-$(date +%m%d-%H%M)
+run_automodel "$SMOKE" --step_scheduler.val_every_steps 10 || fail "smoke run exited non-zero (see logs/$SMOKE.log)"
+summary=$(inspect_run "$SMOKE" 20) || fail "smoke run: $summary"
+[ -f "$S/checkpoints/$SMOKE/epoch_0_step_19/model/adapter_model.safetensors" ] || fail "smoke run left no adapter"
+say "SMOKE $SMOKE $summary"
+fi
+
 run_automodel() {                                                # $1 run name, $2.. extra automodel args
   local run=$1; shift
   [ -e "$S/checkpoints/$run" ] && fail "checkpoint folder $run exists"
@@ -113,12 +124,6 @@ if problems:
     print(" ; ".join(problems)); sys.exit(1)
 EOF
 }
-
-SMOKE=star-test-$(date +%m%d-%H%M)
-run_automodel "$SMOKE" --step_scheduler.val_every_steps 10 || fail "smoke run exited non-zero (see logs/$SMOKE.log)"
-summary=$(inspect_run "$SMOKE" 20) || fail "smoke run: $summary"
-[ -f "$S/checkpoints/$SMOKE/epoch_0_step_19/model/adapter_model.safetensors" ] || fail "smoke run left no adapter"
-say "SMOKE $SMOKE $summary"
 
 # ---- step 7, 200 steps ------------------------------------------------------------------------------------
 RUN=star-200-$(date +%m%d-%H%M)
