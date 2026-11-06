@@ -133,3 +133,28 @@ Pass the per-row CSVs lowest cap first (they are sorted by cap anyway). Each is 
 
 `--out` writes the per-cap summaries, the early-box counts and the warnings as JSON.
 
+## sample_traces.py
+
+`sample_traces.py` samples one served model on a puzzle JSONL and records, per puzzle, whether its first boxed answer is correct. It is the sampling pass of the STaR recipe (Zelikman et al., 2022) used by the [STaR cipher-trace experiment](../experiments/lightning-30b-lora-puzzles-star-dgx-spark/README.md): the model solves the training puzzles on its own and only the final answers are checked. Prompt rendering (chat template, thinking on), greedy decoding and the per-request budget rule are those of `compare_puzzles.py`, whose helpers it imports. Standard library plus `transformers` for the tokenizer.
+
+```bash
+docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/sample_traces.py --selftest
+docker exec -it lightning-lora python3 /shared/nemotron-finetuning/tools/sample_traces.py --data $S/data/cipher-train.jsonl --n 12 --out $S/logs/star-smoke.jsonl
+docker exec -d  lightning-lora bash -c "python3 /shared/nemotron-finetuning/tools/sample_traces.py --data $S/data/cipher-train.jsonl --out $S/logs/star-cipher-7680.jsonl --concurrency 32 --resume > $S/logs/star-cipher-7680.log 2>&1"
+```
+
+Input rows are `{"id", "category", "prompt", "answer"}`. Each generation is appended to `--out` the moment it completes, as `{"id", "category", "model", "finish", "tokens", "budget", "first_box", "first_box_ok", "last_box_ok", "text"}`, so a run of many hours survives a dropped connection; `--resume` skips the ids already in `--out`, which makes the same command safe to run again after a restart. The progress line carries running counts of finished, first-box-correct and truncated generations, and a `.json` summary with per-category counts is written beside `--out` at the end.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--url` | `http://localhost:8000/v1` | The vLLM server. |
+| `--model` | `lightning-base` | The served model name to sample. |
+| `--data` | | The puzzles, with gold answers. |
+| `--n` | `0` | Rows to sample, spread evenly over the file; `0` samples all of them. |
+| `--max-tokens` | `7680` | The generation cap, trimmed per request to the server's window minus the prompt. |
+| `--max-model-len` | `0` | The server's window; `0` reads it from `/v1/models`. |
+| `--timeout` | `0` | Seconds per request; `0` means `max(3600, 2 × --max-tokens)`. |
+| `--concurrency` | `32` | Requests in flight at once. |
+| `--out` | | The output JSONL, appended to. |
+| `--resume` | | Skip ids already present in `--out`. |
+| `--selftest` | | Checks the first-box classification, the resume filter and the summary without a server. |

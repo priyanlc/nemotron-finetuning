@@ -1,0 +1,42 @@
+{
+  "samples": "/shared/nemotron-finetuning/experiments/lightning-30b-lora-puzzles-star-dgx-spark/logs/star-cipher-7680.jsonl",
+  "generations": 1466,
+  "dropped": {
+    "truncated": 999,
+    "first_box_wrong": 76,
+    "over_8192_tokens": 0
+  },
+  "kept": 391,
+  "val_holdout": 10,
+  "train_traces": 381,
+  "repeats": 4,
+  "cipher_rows": 1524,
+  "train_rows": 8898,
+  "val_rows": 60,
+  "per_category": {
+    "bit_ops": 1492,
+    "cipher": 1524,
+    "gravity": 1487,
+    "numeral": 1466,
+    "symbol": 1445,
+    "unit_conv": 1484
+  },
+  "seq_length": 8192,
+  "share": 0.16666666666666666,
+  "completion_tokens": {
+    "mean": 5246,
+    "max": 7643
+  },
+  "total_tokens": {
+    "mean": 5584,
+    "max": 7963
+  },
+  "rows_by_total_length": {
+    "<=2048": 7374,
+    "2049-4096": 284,
+    "4097-6144": 672,
+    "6145-8192": 604
+  },
+  "seed": 0,
+  "shuffle_seed": 2
+}
